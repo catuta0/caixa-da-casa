@@ -1,10 +1,12 @@
 # Caixa da Casa + Caddy (HTTPS automático com Let's Encrypt).
+# Usa a imagem já pronta do GitHub (ghcr.io); só precisas deste ficheiro, do Caddyfile e do .env.
+#
 # Se já tens outro proxy (Nginx, Traefik, Nginx Proxy Manager…), apaga o serviço "caddy"
-# e aponta o teu proxy para a porta 3000 (descomenta "ports" no serviço "caixa").
+# e os volumes caddy-*, e descomenta "ports" no serviço "caixa".
 
 services:
   caixa:
-    build: .
+    image: ghcr.io/catuta0/caixa-da-casa:latest
     container_name: caixa-da-casa
     restart: unless-stopped
     env_file: .env

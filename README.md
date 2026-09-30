@@ -12,6 +12,18 @@ Livro de caixa para casas comunitárias e associações. Toda a gente vê as con
 - **Login com conta Google**; o administrador aprova quem entra e escolhe os tesoureiros.
 - Funciona bem no telemóvel.
 
+## Instalação rápida
+
+Com o Docker instalado, o domínio a apontar para o servidor e o ID do Google criado (passos 1 a 3), basta um comando no servidor:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/catuta0/caixa-da-casa/main/instalar.sh | sh
+```
+
+O script faz 4 perguntas (domínio, ID do Google, o teu email e o nome da casa), descarrega a imagem já pronta e arranca a app com HTTPS.
+
+A imagem está em `ghcr.io/catuta0/caixa-da-casa` e funciona em servidores Intel/AMD e ARM (Raspberry Pi 4/5, servidores Ampere).
+
 ## Índice
 
 1. [Quem pode fazer o quê](#quem-pode-fazer-o-quê)
@@ -19,13 +31,13 @@ Livro de caixa para casas comunitárias e associações. Toda a gente vê as con
 3. [Passo 1: preparar o servidor](#passo-1-preparar-o-servidor)
 4. [Passo 2: apontar o domínio para o servidor](#passo-2-apontar-o-domínio-para-o-servidor)
 5. [Passo 3: criar o ID de cliente do Google](#passo-3-criar-o-id-de-cliente-do-google)
-6. [Passo 4: descarregar e configurar a app](#passo-4-descarregar-e-configurar-a-app)
-7. [Passo 5: arrancar](#passo-5-arrancar)
-8. [Passo 6: primeiros passos dentro da app](#passo-6-primeiros-passos-dentro-da-app)
-9. [Como funcionam as contas](#como-funcionam-as-contas)
-10. [Cópias de segurança](#cópias-de-segurança)
-11. [Atualizar](#atualizar)
-12. [Problemas comuns](#problemas-comuns)
+6. [Passo 4: instalar e arrancar](#passo-4-instalar-e-arrancar)
+7. [Passo 5: primeiros passos dentro da app](#passo-5-primeiros-passos-dentro-da-app)
+8. [Como funcionam as contas](#como-funcionam-as-contas)
+9. [Cópias de segurança](#cópias-de-segurança)
+10. [Atualizar](#atualizar)
+11. [Problemas comuns](#problemas-comuns)
+12. [A imagem Docker](#a-imagem-docker)
 13. [Testar no teu computador](#testar-no-teu-computador)
 14. [Variáveis de configuração](#variáveis-de-configuração)
 15. [Como está feito](#como-está-feito)
@@ -109,14 +121,38 @@ Pode demorar alguns minutos a propagar. Para confirmar: `ping caixa.minhacasa.pt
    - **URIs de redirecionamento autorizados**: deixa vazio, não é preciso.
 6. Carrega em **Criar** e copia o **ID de cliente**. É parecido com `123456789-abc123.apps.googleusercontent.com`. O "segredo do cliente" não é preciso.
 
-## Passo 4: descarregar e configurar a app
+## Passo 4: instalar e arrancar
+
+### Opção A: com o script (recomendado)
 
 No servidor:
 
 ```bash
-git clone https://github.com/catuta0/caixa-da-casa.git
-cd caixa-da-casa
-cp .env.example .env
+curl -fsSL https://raw.githubusercontent.com/catuta0/caixa-da-casa/main/instalar.sh | sh
+```
+
+O script:
+
+1. confirma que o Docker está instalado;
+2. cria a pasta `caixa-da-casa` e descarrega o `docker-compose.yml` e o `Caddyfile`;
+3. pergunta o domínio, o ID de cliente do Google, o teu email (administrador) e o nome da casa, e guarda tudo no `.env`;
+4. descarrega a imagem e arranca a app e o Caddy (HTTPS).
+
+Preferes ver o script antes de o correr? Descarrega-o, lê-o e só depois corre-o:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/catuta0/caixa-da-casa/main/instalar.sh -o instalar.sh
+less instalar.sh
+sh instalar.sh
+```
+
+### Opção B: à mão
+
+```bash
+mkdir caixa-da-casa && cd caixa-da-casa
+curl -fsSLO https://raw.githubusercontent.com/catuta0/caixa-da-casa/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/catuta0/caixa-da-casa/main/Caddyfile
+curl -fsSL https://raw.githubusercontent.com/catuta0/caixa-da-casa/main/.env.example -o .env
 nano .env
 ```
 
@@ -133,28 +169,24 @@ NOME_CASA=Casa comunitária
 - `GOOGLE_CLIENT_ID`: o ID do passo 3.
 - `ADMIN_EMAIL`: o email da conta Google de quem vai administrar. Para ter mais do que um administrador, separa por vírgulas.
 
-Grava com `Ctrl+O`, `Enter`, e sai com `Ctrl+X`.
-
-**Já tens outro proxy** (Nginx, Traefik, Nginx Proxy Manager…) a ocupar as portas 80/443? Abre o `docker-compose.yml`, apaga o serviço `caddy` (e os volumes `caddy-dados` e `caddy-config`), descomenta as duas linhas `ports` do serviço `caixa` e aponta o teu proxy para `http://127.0.0.1:3000`. O proxy tem de fazer HTTPS e não pode guardar em buffer o endereço `/api/eventos` (atualizações em tempo real).
-
-## Passo 5: arrancar
+Grava com `Ctrl+O`, `Enter`, e sai com `Ctrl+X`. Depois arranca:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-A primeira vez demora 1 a 3 minutos. Para ver se está tudo bem:
+### Confirmar que está a funcionar
 
 ```bash
-docker compose ps          # os dois serviços devem estar "running" / "healthy"
+docker compose ps          # os dois serviços devem estar "running" (a app fica "healthy")
 docker compose logs -f     # Ctrl+C para sair
 ```
 
-Abre `https://caixa.minhacasa.pt` e entra com a conta Google do `ADMIN_EMAIL`. Ficas **administrador** e **tesoureiro**.
+Abre `https://caixa.minhacasa.pt` e entra com a conta Google do `ADMIN_EMAIL`. Ficas **administrador** e **tesoureiro**. A app arranca sozinha se o servidor reiniciar.
 
-A app arranca sozinha se o servidor reiniciar.
+**Já tens outro proxy** (Nginx, Traefik, Nginx Proxy Manager…) a ocupar as portas 80/443? Abre o `docker-compose.yml`, apaga o serviço `caddy` (e os volumes `caddy-dados` e `caddy-config`), descomenta as duas linhas `ports` do serviço `caixa` e aponta o teu proxy para `http://127.0.0.1:3000`. O proxy tem de fazer HTTPS e não pode guardar em buffer o endereço `/api/eventos` (atualizações em tempo real).
 
-## Passo 6: primeiros passos dentro da app
+## Passo 5: primeiros passos dentro da app
 
 1. **Definições → A casa e o dinheiro**: nome da casa, plafond mensal de compras e o dinheiro que há agora no fundo de maneio (saldo inicial).
 2. **Manda o endereço da app** às pessoas da casa. Cada uma entra com o Google e fica **à espera**.
@@ -206,13 +238,14 @@ docker compose start caixa
 
 ## Atualizar
 
+Na pasta da app:
+
 ```bash
-cd caixa-da-casa
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-Os dados ficam no volume e não se perdem. Faz uma cópia de segurança antes, por precaução.
+Os dados ficam no volume e não se perdem. Faz uma cópia de segurança antes, por precaução. (Correr outra vez o `instalar.sh` também atualiza, e mantém o `.env`.)
 
 ## Problemas comuns
 
@@ -236,6 +269,34 @@ Vê em **Definições → Membros** se está à espera (aprova-a) ou marcada com
 
 **As alterações dos outros só aparecem quando recarrego.**
 Se usas o teu próprio proxy, desliga o buffering para `/api/eventos` (no Nginx: `proxy_buffering off;`).
+
+## A imagem Docker
+
+- **Imagem:** `ghcr.io/catuta0/caixa-da-casa`
+- **Etiquetas:** `latest` (última versão do `main`), versões (`1.0.0`, `1.0`) quando há tags `v1.0.0`, e o commit (`7a4c4ec`…).
+- **Arquiteturas:** `linux/amd64` e `linux/arm64`.
+- É construída e publicada automaticamente pelo GitHub Actions (`.github/workflows/imagem-docker.yml`) sempre que há alterações no `main`.
+- Dados em `/app/dados` (monta um volume aí). Porta `3000`. Corre como utilizador sem privilégios (`node`).
+
+Sem Docker Compose (tens de pôr o teu próprio HTTPS à frente):
+
+```bash
+docker run -d --name caixa-da-casa --restart unless-stopped \
+  -p 127.0.0.1:3000:3000 \
+  -v caixa-dados:/app/dados \
+  -e GOOGLE_CLIENT_ID=123456789-abc123.apps.googleusercontent.com \
+  -e ADMIN_EMAIL=o-teu-email@gmail.com \
+  ghcr.io/catuta0/caixa-da-casa:latest
+```
+
+Para construir a imagem tu próprio (por exemplo depois de mudares o código):
+
+```bash
+git clone https://github.com/catuta0/caixa-da-casa.git
+cd caixa-da-casa
+docker build -t ghcr.io/catuta0/caixa-da-casa:latest .
+docker compose up -d
+```
 
 ## Testar no teu computador
 
@@ -275,9 +336,11 @@ caixa-da-casa/
 ├── server.js            servidor Node.js (Express) + SQLite embutido (node:sqlite)
 ├── public/index.html    a app (HTML, CSS e JavaScript, sem build)
 ├── Dockerfile           imagem da app
-├── docker-compose.yml   app + Caddy (HTTPS)
+├── docker-compose.yml   app (imagem pronta) + Caddy (HTTPS)
 ├── Caddyfile            configuração do Caddy
-└── .env.example         modelo da configuração
+├── instalar.sh          instalação com um comando
+├── .env.example         modelo da configuração
+└── .github/workflows/   constrói e publica a imagem Docker
 ```
 
 - Login com **Google Identity Services**; o token é verificado no servidor e a sessão fica num cookie `HttpOnly`.
