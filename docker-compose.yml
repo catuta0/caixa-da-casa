@@ -1,0 +1,35 @@
+# Caixa da Casa + Caddy (HTTPS automático com Let's Encrypt).
+# Se já tens outro proxy (Nginx, Traefik, Nginx Proxy Manager…), apaga o serviço "caddy"
+# e aponta o teu proxy para a porta 3000 (descomenta "ports" no serviço "caixa").
+
+services:
+  caixa:
+    build: .
+    container_name: caixa-da-casa
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - caixa-dados:/app/dados
+    # ports:
+    #   - "127.0.0.1:3000:3000"
+
+  caddy:
+    image: caddy:2
+    container_name: caixa-caddy
+    restart: unless-stopped
+    depends_on:
+      - caixa
+    environment:
+      - DOMINIO=${DOMINIO}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-dados:/data
+      - caddy-config:/config
+
+volumes:
+  caixa-dados:
+  caddy-dados:
+  caddy-config:

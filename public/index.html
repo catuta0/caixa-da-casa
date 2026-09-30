@@ -1,0 +1,1270 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2A4F86">
+<title>Caixa da Casa</title>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{
+  --bg:#EDF2EE; --surface:#FFFFFF; --surface2:#F5F8F5; --ink:#1B2521; --muted:#57665F; --line:#D2DCD5; --rule:#E4EBE6;
+  --accent:#2A4F86; --accent-ink:#FFFFFF; --accent-soft:#E2E9F4;
+  --good:#2B7746; --good-soft:#E0F0E5; --warn:#955F07; --warn-soft:#FAEFD9; --bad:#B42318; --bad-soft:#FBE5E2;
+  --track:#DCE4DE; --shadow:0 1px 2px rgba(20,40,30,.06),0 4px 16px rgba(20,40,30,.05);
+  --f-display:"Familjen Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#101613; --surface:#18201C; --surface2:#1D2622; --ink:#E2E9E5; --muted:#97A59E; --line:#2D3833; --rule:#242E2A;
+    --accent:#8FB1E8; --accent-ink:#0D1829; --accent-soft:#1D2A3F;
+    --good:#6DC98F; --good-soft:#15301F; --warn:#E2AD55; --warn-soft:#33270F; --bad:#F08A7E; --bad-soft:#3A1A16;
+    --track:#28332E; --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#101613; --surface:#18201C; --surface2:#1D2622; --ink:#E2E9E5; --muted:#97A59E; --line:#2D3833; --rule:#242E2A;
+  --accent:#8FB1E8; --accent-ink:#0D1829; --accent-soft:#1D2A3F;
+  --good:#6DC98F; --good-soft:#15301F; --warn:#E2AD55; --warn-soft:#33270F; --bad:#F08A7E; --bad-soft:#3A1A16;
+  --track:#28332E; --shadow:none;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:20px 56px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:28px;font-weight:700;line-height:1.15}
+h2{font-size:20px;font-weight:600}
+h3{font-size:16px;font-weight:600}
+.num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-bottom:16px}
+.brand{display:grid;gap:2px}
+.monthnav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.monthnav .mlabel{font-family:var(--f-display);font-weight:600;font-size:18px;min-width:9.5em;text-align:center}
+.iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:18px;line-height:1}
+.iconbtn:hover{border-color:var(--accent)}
+.linkbtn{background:none;border:none;color:var(--accent);cursor:pointer;padding:4px 6px;font-weight:600;font-size:13.5px}
+.linkbtn:hover{text-decoration:underline}
+
+/* tabs */
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:20px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:none;padding:10px 12px;cursor:pointer;color:var(--muted);font-weight:600;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+
+.stack{display:grid;gap:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+
+/* banners */
+.banner{border-radius:12px;padding:10px 14px;font-size:14px;margin-bottom:16px;border:1px solid}
+.banner.info{background:var(--accent-soft);border-color:transparent;color:var(--ink)}
+.banner.warn{background:var(--warn-soft);border-color:transparent;color:var(--ink)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:10;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.toast.ok{background:var(--good);color:var(--surface)}
+.toast.err{background:var(--bad);color:#fff}
+
+/* plafond hero */
+.hero{display:grid;gap:14px}
+.hero-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:8px 24px}
+.big{font-family:var(--f-display);font-weight:700;font-size:clamp(34px,7vw,48px);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.big small{font-size:16px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:6px}
+.big.over{color:var(--bad)}
+.bar{position:relative;height:14px;border-radius:7px;background:var(--track)}
+.bar .fill{position:absolute;inset:0 auto 0 0;border-radius:7px;background:var(--accent)}
+.bar .fill.warn{background:var(--warn)}
+.bar .fill.bad{background:var(--bad)}
+.bar .pace{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink);opacity:.55;border-radius:1px}
+.bar-legend{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 16px;font-size:13.5px;color:var(--muted)}
+.bar-legend b{color:var(--ink);font-weight:600}
+
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:720px){.stats{grid-template-columns:1fr}}
+.stat{display:grid;gap:4px;align-content:start}
+.stat .val{font-family:var(--f-display);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+.stat .sub{font-size:13.5px;color:var(--muted)}
+.stat button{justify-self:start;margin-left:-6px}
+
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.neutral{background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+
+/* movement list */
+.movs{list-style:none;margin:0;padding:0}
+.mov{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;padding:11px 0;border-top:1px solid var(--rule)}
+.mov:first-child{border-top:none}
+.mov-desc{font-weight:600}
+.mov-meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center}
+.mov-val{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;font-weight:500;white-space:nowrap}
+.mov-val.in{color:var(--good)}
+.mov-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.mov.anulado .mov-desc,.mov.anulado .mov-val{text-decoration:line-through;color:var(--muted)}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13.5px;background:var(--surface2);border:1px solid var(--line);padding:6px 10px;border-radius:10px}
+.empty{color:var(--muted);padding:12px 0;font-size:14px}
+.total-row{display:flex;justify-content:space-between;gap:12px;padding-top:12px;margin-top:4px;border-top:2px solid var(--line);font-weight:600}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.small{padding:4px 10px;font-size:13px;border-radius:8px}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.55;cursor:default}
+
+/* forms */
+.form h3{margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.fld{display:grid;gap:5px;font-size:13px;font-weight:600;color:var(--muted);min-width:0}
+.fld.wide{grid-column:1/-1}
+.fld input,.fld select{width:100%;min-width:0;font-size:15px;font-weight:400;color:var(--ink);background:var(--surface2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;height:42px}
+.fld input:focus,.fld select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--ink);font-weight:500;cursor:pointer}
+.check input{width:18px;height:18px;margin-top:2px;accent-color:var(--accent)}
+.form-foot{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-top:14px}
+.hint{font-size:13px;color:var(--muted)}
+
+/* tables */
+.tablewrap{overflow-x:auto;margin-inline:-4px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 8px;border-bottom:1px solid var(--rule);vertical-align:middle}
+td.r,th.r{text-align:right}
+td.num{white-space:nowrap}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:var(--surface2)}
+tr.sel td{background:var(--accent-soft)}
+tfoot td{font-weight:600;border-top:2px solid var(--line);border-bottom:none}
+.ledger td.num{font-size:13.5px}
+.ledger .in{color:var(--good)}
+.ledger .open td{color:var(--muted);font-style:italic}
+
+.two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:820px){.two{grid-template-columns:1fr}}
+.checklist{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.checklist li{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);display:inline-grid;place-items:center;font-size:12px;flex:none}
+.dot.done{background:var(--good);border-color:var(--good);color:var(--surface)}
+.people{display:grid;gap:8px;margin-top:8px}
+.person{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.loading{padding:48px 0;text-align:center;color:var(--muted)}
+.prev input{width:110px;max-width:100%;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;height:36px}
+.prev input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.prev input:disabled{background:transparent;border-color:transparent}
+.prev td{padding-block:6px}
+td.c,th.c{text-align:center}
+.linha-nome{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rm{border:none;background:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;width:26px;height:26px;border-radius:6px;flex:none}
+.rm:hover{color:var(--bad);background:var(--bad-soft)}
+.add-desp{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;margin-top:12px}
+.add-desp .fld{flex:1 1 220px;max-width:360px}
+.prev .prev-com{width:18px;height:18px;accent-color:var(--accent)}
+.prev-res{display:flex;flex-direction:column;gap:6px;margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--accent-soft);font-size:15px}
+.prev-cada{font-family:var(--f-display);font-size:22px;color:var(--accent)}
+.tab.sec{font-weight:500;font-size:13.5px}
+.tab-sep{flex:none;width:1px;background:var(--line);margin:10px 6px}
+.voltar{padding-left:0;margin:-10px 0 12px}
+.acoes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:640px){.acoes{grid-template-columns:1fr}}
+.acao{display:grid;gap:2px;text-align:left;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+.acao b{font-family:var(--f-display);font-size:17px;font-weight:600}
+.acao span{font-size:13px;color:var(--muted)}
+.acao:hover{border-color:var(--accent)}
+.acao.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.acao.primary span{color:var(--accent-ink);opacity:.85}
+.acao[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:3px}
+.fotos-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.thumb{position:relative;width:64px;height:64px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface2);flex:none}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb-pdf{display:grid;place-items:center;width:100%;height:100%;font-size:12px;font-weight:700;color:var(--muted)}
+.thumb-x{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;line-height:1;font-size:14px}
+.mov-fotos{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.thumb-btn{width:44px;height:44px;padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:zoom-in;background:var(--surface2)}
+.thumb-btn img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb-pdf.sm{width:44px;height:44px;border:1px solid var(--line);border-radius:8px;text-decoration:none}
+.lightbox{position:fixed;inset:0;z-index:20;background:rgba(10,14,12,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.lightbox img{max-width:100%;max-height:calc(100% - 64px);object-fit:contain;border-radius:8px;background:#fff}
+.filtros{display:flex;gap:6px;flex-wrap:wrap}
+.filtro{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer;font-weight:600;color:var(--muted)}
+.filtro:hover{border-color:var(--accent)}
+.filtro[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.sub-sec{font-size:17px;margin-top:8px;color:var(--muted)}
+.detalhes summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.detalhes .card{border:none;box-shadow:none;padding:0;margin-top:14px;background:none}
+.hero-acoes{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.btn.grande{padding:12px 18px;font-size:15px;border-radius:12px;flex:1 1 170px}
+.btn[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+.eu-pick{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
+.eu-pick select{font-size:15px;height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);min-width:0;max-width:100%}
+.eu-num{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px}
+.eu-num span{display:block;font-size:12.5px;color:var(--muted)}
+.eu-num b{display:block;font-family:var(--f-display);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+@media (max-width:420px){.eu-num b{font-size:19px}}
+.eu-links{display:flex;gap:4px 14px;flex-wrap:wrap;margin-top:10px;margin-left:-6px}
+.nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+@media (max-width:560px){.nums{grid-template-columns:1fr}}
+.num-item{text-align:left;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:grid;gap:1px;color:var(--ink)}
+.num-item:hover{border-color:var(--accent)}
+.num-item span{font-size:12.5px;color:var(--muted)}
+.num-item b{font-family:var(--f-display);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.num-item small{font-size:12px;color:var(--muted)}
+.ajuste-form{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.ajuste-form input{width:90px;height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);text-align:right;font-family:var(--f-mono)}
+.linkbtn.mini{font-size:12.5px;padding:0 2px}
+.l-short{display:none}
+/* telemóvel: tabelas viram cartões e os separadores ficam numa barra em baixo */
+@media (max-width:640px){
+  h1{font-size:23px}
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:15;margin:0;background:var(--surface);border-top:1px solid var(--line);border-bottom:none;padding:0 4px env(safe-area-inset-bottom,0px);gap:0;overflow:visible;box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+  .tab,.tab.sec{flex:1 1 0;min-width:0;padding:13px 2px 11px;font-size:12.5px;font-weight:600;margin:0;border-bottom:none;border-top:2px solid transparent;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tab[aria-selected="true"]{border-top-color:var(--accent);border-bottom-color:transparent}
+  .tab-sep,.l-long,.voltar{display:none}
+  .l-short{display:inline}
+  .wrap{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+  .toast{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
+  .card{padding:15px}
+  .tablewrap{overflow:visible;margin-inline:0}
+  .tablewrap table,.tablewrap tbody,.tablewrap tfoot,.tablewrap tr,.tablewrap td{display:block;width:100%}
+  .tablewrap thead{display:none}
+  .tablewrap tr{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px;background:var(--surface)}
+  .tablewrap tfoot tr{background:var(--surface2)}
+  .tablewrap td,.tablewrap tfoot td{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px 12px;border:none;padding:5px 0;text-align:right;white-space:normal}
+  .tablewrap td::before{content:attr(data-label);color:var(--muted);font-size:12.5px;font-weight:600;text-align:left;font-family:var(--f-body);font-style:normal}
+  .tablewrap td:not([data-label])::before{display:none}
+  .tablewrap td:empty{display:none}
+  .tablewrap td:first-child{font-size:16px;text-align:left;justify-content:flex-start;padding:2px 0 8px;margin-bottom:4px;border-bottom:1px solid var(--rule)}
+  .tablewrap td:first-child::before{display:none}
+  .tablewrap tr.clickable:hover td{background:none}
+  .tablewrap tr.sel{border-color:var(--accent)}
+  .ledger td:first-child{font-size:12.5px;color:var(--muted);border:none;margin:0;padding:0}
+  .ledger td:nth-child(2){font-size:15px;font-weight:600;text-align:left;justify-content:flex-start;padding:2px 0 8px;margin-bottom:4px;border-bottom:1px solid var(--rule)}
+  .ledger td:nth-child(2)::before{display:none}
+  .ledger .open td{font-style:normal}
+  .prev td:first-child{font-size:15px}
+  .ajuste-form,.tablewrap td form{justify-content:flex-end;width:100%}
+  .section-head{align-items:flex-start}
+}
+.entrada{min-height:70vh;display:grid;place-items:center}
+.entrada-card{max-width:460px;width:100%;display:grid;gap:10px}
+.entrada-card p{margin:0;color:var(--muted);line-height:1.55}
+.g-botao{min-height:44px;display:flex;align-items:center;margin-top:6px}
+.dev{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+.quem{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted);margin-top:4px}
+.quem .linkbtn{padding:2px 4px}
+.avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none;background:var(--surface2);border:1px solid var(--line)}
+.avatar.sm{width:22px;height:22px}
+.avatar.vazio{display:inline-grid;place-items:center;font-weight:700;color:var(--muted);font-family:var(--f-display)}
+.membros{display:grid;gap:8px;margin-top:8px}
+.membro{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.membro.edit{border-color:var(--accent);display:grid;gap:12px}
+.membro-topo{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.membro-nome{display:grid;gap:2px;flex:1 1 180px;min-width:0}
+.membro-nome .muted{font-size:13px;overflow-wrap:anywhere}
+.membro-chips{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:12.5px}
+.sub-h{font-size:14px;color:var(--muted);margin:16px 0 0;font-family:var(--f-body);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+code{font-family:var(--f-mono);font-size:.92em}
+a.btn{text-decoration:none;color:inherit;display:inline-block}
+.breakdown{display:grid;gap:6px;margin-top:6px}
+.breakdown div{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+@media (prefers-reduced-motion:no-preference){.bar .fill{transition:width .4s ease}}
+</style>
+
+</head>
+<body>
+<div class="wrap" id="app"><div class="loading">A abrir o livro de caixa…</div></div>
+<div id="toast" hidden></div>
+<input type="file" id="anexo" accept="image/*,application/pdf" multiple hidden>
+
+<script>
+(function(){
+"use strict";
+const DEF={nome:"Casa comunitária",plafond:40000,plafondMes:{},rendaMes:{},previsaoMes:{},fundoInicial:0,rendasNoFundo:true,anoInicio:null};
+/* despesas da casa: editáveis na calculadora da renda; cada uma (menos a reserva) é também um tipo de conta */
+const DESPESAS_DEF=[{id:"renda",nome:"Renda ao senhorio",cat:"Renda da casa"},{id:"agua",nome:"Água"},{id:"luz",nome:"Luz"},{id:"gas",nome:"Gás"},{id:"internet",nome:"Internet"},{id:"condominio",nome:"Condomínio"},{id:"seguro",nome:"Seguro"},{id:"outra",nome:"Outras contas",cat:"Outra"},{id:"reserva",nome:"Reserva para o fundo de maneio",semConta:true}];
+const despesas=()=>S.config.despesas||DESPESAS_DEF;
+const catDe=d=>d.cat||d.nome;
+function tiposConta(){const t=despesas().filter(d=>!d.removida&&!d.semConta).map(catDe);if(!t.includes("Outra"))t.push("Outra");return t}
+function nomeLinha(k){if(k==="plafond")return "comida";const d=despesas().find(x=>x.id===k);return d?d.nome.toLowerCase():k}
+const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const TABS=[["resumo","Resumo","Resumo"],["rendas","Rendas","Rendas"],["fundo","Fundo de maneio","Fundo"],["historico","Histórico","Histórico"],["definicoes","Definições","Definições"]];
+
+const pad=n=>String(n).padStart(2,"0");
+function hoje(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+const hojeMes=()=>hoje().slice(0,7);
+function addMes(m,n){let y=+m.slice(0,4),mm=+m.slice(5,7)+n;while(mm>12){mm-=12;y++}while(mm<1){mm+=12;y--}return y+"-"+pad(mm)}
+function nomeMes(m){return MESES[+m.slice(5,7)-1].replace(/^./,c=>c.toUpperCase())+" "+m.slice(0,4)}
+function nomeMesCurto(m){return MESES[+m.slice(5,7)-1].slice(0,3)+" "+m.slice(2,4)}
+function diasNoMes(m){return new Date(+m.slice(0,4),+m.slice(5,7),0).getDate()}
+function dataCurta(d){if(!d)return"";return +d.slice(8,10)+" "+MESES[+d.slice(5,7)-1].slice(0,3)}
+const EUR=new Intl.NumberFormat("pt-PT",{style:"currency",currency:"EUR"});
+const eur=c=>EUR.format((c||0)/100);
+const eurNum=c=>((c||0)/100).toFixed(2).replace(".",",");
+function h(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function parseValor(s){s=String(s||"").trim().replace(/[€\s]/g,"");if(!s)return null;if(s.includes(","))s=s.replace(/\./g,"").replace(",",".");const n=Number(s);if(!isFinite(n)||n<=0)return null;return Math.round(n*100)}
+const sum=a=>a.reduce((t,x)=>t+(x.cent||0),0);
+
+const S={me:null,users:[],canWrite:true,loading:true,saving:false,
+  config:Object.assign({},DEF),moradores:[],movs:{},mes:hojeMes(),tab:"resumo",
+  confirm:null,rendaEdit:null,ajusteEdit:null,eu:null,tes:false,detAberto:false,filtro:"tudo",verTodos:false,fotos:{c:[],k:[]},anexoAlvo:null,verFoto:null,resumoForm:null,editMembro:null,names:{},fresh:true,reset:null};
+const app=document.getElementById("app");
+
+/* ---------- derived data ---------- */
+function allMovs(){let a=[];for(const y in S.movs)a=a.concat(S.movs[y]);return a}
+const vivos=()=>allMovs().filter(x=>!x.anulado);
+function ordem(a,b){return (b.data||"").localeCompare(a.data||"")||(b.criadoEm||"").localeCompare(a.criadoEm||"")}
+function plafondDe(m){const pm=S.config.plafondMes||{};return pm[m]!=null?pm[m]:(S.config.plafond||0)}
+function ativoEm(r,m){return (!r.entrada||r.entrada<=m)&&(!r.saida||r.saida>=m)}
+function efeito(x){
+  if(x.anulado)return 0;
+  if(x.tipo==="fundo")return x.sentido==="entrada"?x.cent:-x.cent;
+  if(x.tipo==="renda")return S.config.rendasNoFundo?x.cent:0;
+  if(x.tipo==="compra"||x.tipo==="conta"){if(x.pagoPor==="fundo"||x.reembolsado)return -x.cent;return 0}
+  return 0;
+}
+function saldoAte(m,vis){vis=vis||vivos();return (S.config.fundoInicial||0)+vis.filter(x=>x.mes<=m).reduce((t,x)=>t+efeito(x),0)}
+function stats(m,vis){
+  vis=vis||vivos();
+  const doMes=vis.filter(x=>x.mes===m);
+  const ativos=S.moradores.filter(r=>ativoEm(r,m));
+  return {
+    compras:sum(doMes.filter(x=>x.tipo==="compra")),
+    contas:sum(doMes.filter(x=>x.tipo==="conta")),
+    nContas:doMes.filter(x=>x.tipo==="conta").length,
+    rendasRec:sum(doMes.filter(x=>x.tipo==="renda")),
+    rendasEsp:rendaEfetiva(m)||0,
+    plafond:plafondDe(m),
+    saldo:saldoAte(m,vis),
+    ativos
+  };
+}
+/* renda da casa: um valor total por mês, dividido em partes iguais pelos moradores desse mês */
+function rendaTotal(m){const rm=S.config.rendaMes||{};return rm[m]!=null?rm[m]:null}
+/* moradores pagam tudo; comensais (só comem cá) pagam a sua parte das despesas escolhidas, ou um valor fixo.
+   A regra de cada mês fica guardada quando se define a renda, para os meses passados não mudarem. */
+const LINHAS_COM_DEF=["plafond","internet","gas"];
+const eComensal=r=>r.tipo==="comensal"||r.tipo==="meio";
+const eMeio=r=>r.tipo==="meio";
+const nomeTipo=r=>r.tipo==="meio"?"meio comensal":r.tipo==="comensal"?"comensal":"morador";
+function regraAtual(){
+  const fixos={},comensais=[],meios=[];
+  S.moradores.forEach(r=>{if(eComensal(r)){comensais.push(r.id);if(eMeio(r))meios.push(r.id);if(r.valorFixo!=null)fixos[r.id]=r.valorFixo}});
+  return {linhas:(S.config.comensalLinhas||LINHAS_COM_DEF).slice(),fixos,comensais,meios,pessoas:S.moradores.map(r=>r.id)};
+}
+/* uma pessoa pelo id, mesmo que hoje já não seja morador/comensal (para meses antigos) */
+function pessoaInfo(id){
+  const r=S.moradores.find(x=>x.id===id);if(r)return r;
+  const u=S.users.find(x=>x.id===id);return u?{id:u.id,nome:u.nome,tipo:u.tipo,valorFixo:u.valorFixo,entrada:u.entrada,saida:u.saida}:null;
+}
+/* quem conta para a renda de um mês: os de agora e os que estavam na regra guardada desse mês */
+function pessoasCasa(m){
+  const ids=new Set(S.moradores.map(r=>r.id));
+  const extra=(regraDe(m).pessoas||[]).filter(id=>!ids.has(id)).map(pessoaInfo).filter(Boolean);
+  return S.moradores.concat(extra);
+}
+/* acertos manuais do tesoureiro: valor da parte de uma pessoa num mês */
+const ajustesDe=m=>(S.config.ajustesMes||{})[m]||{};
+function regraDe(m){
+  const d=(S.config.divisaoMes||{})[m];
+  const r=d?{linhas:d.linhas||[],fixos:d.fixos||{},comensais:d.comensais||[],meios:d.meios||[],pessoas:d.pessoas||null}:regraAtual();
+  r.ajustes=ajustesDe(m);return r;
+}
+function dividir(t,rs,out){dividirPeso(t,rs.map(r=>({id:r.id,w:1})),out)}
+/* divide t cêntimos por pesos; os cêntimos que sobram vão um a um pela ordem da lista */
+function dividirPeso(t,gs,out){
+  const W=gs.reduce((s,g)=>s+g.w,0);if(!W||t<=0)return;
+  let dado=0;const bases=gs.map(g=>{const b=Math.floor(t*g.w/W);dado+=b;return b});
+  let r=t-dado;gs.forEach((g,i)=>{out[g.id]=(out[g.id]||0)+bases[i]+(r>0?1:0);if(r>0)r--});
+}
+function divisao(t,v,m,regra){
+  regra=regra||regraDe(m);
+  const aj=regra.ajustes||{},meios=regra.meios||[];
+  const base=regra.pessoas?regra.pessoas.map(pessoaInfo).filter(Boolean):S.moradores;
+  const todos=base.filter(r=>ativoEm(r,m)).sort((a,b)=>a.nome.localeCompare(b.nome,"pt")||a.id.localeCompare(b.id));
+  const isCom=r=>regra.comensais.includes(r.id),isMeio=r=>meios.includes(r.id),peso=r=>isMeio(r)?.5:1;
+  const mor=todos.filter(r=>!isCom(r)),com=todos.filter(isCom);
+  const comFixo=com.filter(r=>regra.fixos[r.id]!=null),comParte=com.filter(r=>regra.fixos[r.id]==null);
+  const out={};let resto=t;const fixos=[],ajustados=[];
+  comFixo.forEach(r=>{const f=Math.max(0,Math.min(resto,regra.fixos[r.id]));out[r.id]=f;resto-=f;fixos.push({nome:r.nome,valor:f})});
+  const valLinhas=regra.linhas.reduce((s,k)=>s+((v&&v[k])||0),0);
+  let P=0,cadaCom=0;
+  if(!mor.length){
+    const gs=comParte.map(r=>({id:r.id,w:peso(r)})),W=gs.reduce((s,g)=>s+g.w,0);
+    dividirPeso(resto,gs,out);cadaCom=W?Math.round(resto/W):0;
+  }else{
+    P=comParte.length?Math.min(resto,valLinhas):0;
+    const gs=mor.map(r=>({id:r.id,w:1})).concat(comParte.map(r=>({id:r.id,w:peso(r)}))),W=gs.reduce((s,g)=>s+g.w,0);
+    dividirPeso(P,gs,out);dividir(resto-P,mor,out);
+    cadaCom=comParte.length?Math.round(P/W):0;
+  }
+  /* acertos à mão: a pessoa passa a pagar esse valor e a renda total do mês ajusta-se (os outros não mudam) */
+  const somaBase=todos.reduce((s,r)=>s+(out[r.id]||0),0);
+  todos.forEach(r=>{if(aj[r.id]!=null){out[r.id]=aj[r.id];ajustados.push({nome:r.nome,valor:aj[r.id]})}});
+  const livresMor=mor.filter(r=>aj[r.id]==null),livresCom=comParte.filter(r=>aj[r.id]==null),dif=0;
+  const cadaMor=livresMor.length?Math.round(livresMor.reduce((s,r)=>s+(out[r.id]||0),0)/livresMor.length):0;
+  const soma=todos.reduce((s,r)=>s+(out[r.id]||0),0);
+  const cc=!livresMor.length&&dif&&livresCom.length?Math.round(livresCom.filter(r=>!isMeio(r)).reduce((s,r)=>s+(out[r.id]||0),0)/Math.max(1,livresCom.filter(r=>!isMeio(r)).length)):cadaCom;
+  return {out,nTodos:todos.length,nMor:livresMor.length,nComParte:livresCom.filter(r=>!isMeio(r)).length,nMeio:livresCom.filter(isMeio).length,
+    fixos,ajustados,cadaCom:cc,cadaMeio:Math.round(cc/2),cadaMor,linhas:regra.linhas,soma,somaBase,total:t};
+}
+const _q={};
+function divisaoDe(m){if(m in _q)return _q[m];const t=rendaTotal(m);return _q[m]=t?divisao(t,previsaoBase(m,vivos()).v,m):null}
+function quotasDe(m){const d=divisaoDe(m);return d?d.out:{}}
+/* renda total efetiva: a calculada, mais/menos os acertos à mão do tesoureiro */
+function rendaEfetiva(m){const d=divisaoDe(m);return d?d.soma:null}
+/* o que vai para o senhorio: a linha "renda ao senhorio" da previsão, se houver */
+function valorSenhorio(m){const pv=(S.config.previsaoMes||{})[m];return pv&&pv.renda?pv.renda:rendaTotal(m)}
+function textoDivisao(d){
+  if(!d.nTodos)return "Não há ninguém na casa neste mês para dividir a renda.";
+  const p=[];
+  d.ajustados.forEach(x=>p.push(`${h(x.nome)} paga <b>${eur(x.valor)}</b> (acertado pelo tesoureiro)`));
+  d.fixos.forEach(x=>p.push(`${h(x.nome)} paga o valor fixo de <b>${eur(x.valor)}</b>`));
+  if(d.nComParte||d.nMeio){
+    if(!d.nMor){if(d.nComParte)p.push(`cada comensal paga <b>${eur(d.cadaCom)}</b>`);if(d.nMeio)p.push(`cada meio comensal paga <b>${eur(d.cadaMeio)}</b>`)}
+    else if(!d.linhas.length)p.push(`os comensais sem valor fixo não pagam nada (não há despesas escolhidas para eles)`);
+    else{
+      const l=d.linhas.map(nomeLinha).join(", ").replace(/, ([^,]*)$/," e $1");
+      if(d.nComParte)p.push(`${d.fixos.length?"cada um dos outros comensais":"cada comensal"} paga a sua parte de ${l}: <b>${eur(d.cadaCom)}</b>`);
+      if(d.nMeio)p.push(`cada meio comensal paga metade${d.nComParte?" disso":" da parte de um comensal em "+l}: <b>${eur(d.cadaMeio)}</b>`);
+    }
+  }
+  if(d.nMor)p.push(`cada morador paga <b>${eur(d.cadaMor)}</b>`);
+  let s=p.join("; ")+".";s=s.charAt(0).toUpperCase()+s.slice(1);
+  if(d.somaBase!==d.total)s+=` <span style="color:var(--bad)">Atenção: a soma das partes (${eur(d.somaBase)}) não bate com a renda calculada (${eur(d.total)}).</span>`;
+  return s;
+}
+/* parte do mês na tabela das rendas; o tesoureiro pode acertar à mão */
+function celulaParte(r,d,m){
+  const aj=ajustesDe(m)[r.id],acertado=aj!=null;
+  if(gere()&&S.ajusteEdit===r.id)return `<form data-form="ajuste" data-id="${h(r.id)}" class="ajuste-form" autocomplete="off">
+    <input id="f-a-valor" inputmode="decimal" value="${eurNum(d.parte)}" aria-label="Parte de ${h(r.nome)} este mês">
+    <button class="btn small primary" type="submit"${S.saving?" disabled":""}>Guardar</button><button class="btn small" type="button" data-act="ajuste-fechar">Cancelar</button>
+    ${acertado?`<button class="linkbtn" type="button" data-act="ajuste-rm" data-id="${h(r.id)}">Voltar ao cálculo automático</button>`:""}</form>`;
+  const v=d.parte?eur(d.parte):"—";
+  return `${v}${acertado?' <span class="chip warn" title="Valor acertado à mão pelo tesoureiro">acertado</span>':""}${gere()&&rendaTotal(m)?`<br><button class="linkbtn mini" data-act="ajuste-abrir" data-id="${h(r.id)}">Alterar</button>`:""}`;
+}
+/* antes: o que ficou de meses anteriores (+ em dívida, − pago a mais) */
+/* compras/contas pagas do próprio bolso: descontam logo na renda do mês da compra (mesmo que fique negativa), a não ser que o tesoureiro as pague em dinheiro */
+const eBolso=x=>(x.tipo==="compra"||x.tipo==="conta")&&x.pagoPor==="bolso";
+const creditosDe=(r,vis)=>vis.filter(x=>eBolso(x)&&!x.reembolsado&&x.morador===r.id);
+function rendaDe(r,m,vis){
+  vis=vis||vivos();
+  const pagos=vis.filter(x=>x.tipo==="renda"&&x.morador===r.id),cred=creditosDe(r,vis);
+  let antes=0;
+  Object.keys(S.config.rendaMes||{}).forEach(k=>{if(k<m)antes+=quotasDe(k)[r.id]||0});
+  antes-=sum(pagos.filter(x=>x.mes<m))+sum(cred.filter(x=>x.mes<m));
+  const desconto=sum(cred.filter(x=>x.mes===m));
+  const parte=quotasDe(m)[r.id]||0,devido=parte+antes-desconto,pago=sum(pagos.filter(x=>x.mes===m)),saldo=devido-pago;
+  const falta=Math.max(0,saldo),aFavor=Math.max(0,-saldo);
+  let estado;
+  if(saldo<=0&&pago>0)estado=["good",aFavor?"Pago, com crédito":"Pago"];
+  else if(saldo<=0)estado=aFavor?["good","Com crédito"]:["neutral","Nada a pagar"];
+  else if(pago>0)estado=["warn","Parcial"];
+  else estado=m<hojeMes()?["bad","Em falta"]:["neutral","Por pagar"];
+  return {parte,antes,desconto,devido,pago,falta,aFavor,estado};
+}
+const nomeMorador=id=>{const u=S.users.find(x=>x.id===id);return u?u.nome:""};
+function porReembolsar(){
+  const lim=addMes(hojeMes(),-1);
+  const pend=vivos().filter(x=>eBolso(x)&&!x.reembolsado&&x.mes>=lim);
+  const by={};pend.forEach(x=>{const k=x.moradorNome||"Sem nome";(by[k]=by[k]||[]).push(x)});
+  return {pend,by};
+}
+
+/* ---------- rendering ---------- */
+function schedule(){if(!schedule.q){schedule.q=true;requestAnimationFrame(()=>{schedule.q=false;render()})}}
+function render(){
+  for(const k in _q)delete _q[k];
+  const vals={};
+  if(!S.fresh)app.querySelectorAll('[id^="f-"]').forEach(el=>{if(S.reset&&el.id.startsWith(S.reset))return;if(S.reset2&&el.id.startsWith(S.reset2))return;vals[el.id]=el.type==="checkbox"?el.checked:el.value});
+  const act=document.activeElement,actId=act&&act.id&&!S.fresh?act.id:null;let sel=null;
+  try{if(actId&&act.selectionStart!=null)sel=[act.selectionStart,act.selectionEnd]}catch(e){}
+  S.fresh=false;S.reset=null;S.reset2=null;
+  app.innerHTML=S.loading?'<div class="loading">A abrir o livro de caixa…</div>':page();
+  for(const id in vals){const el=document.getElementById(id);if(!el)continue;if(el.type==="checkbox")el.checked=vals[id];else if(el.tagName!=="SELECT"||[...el.options].some(o=>o.value===vals[id]))el.value=vals[id]}
+  if(actId){const el=document.getElementById(actId);if(el){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(e){}}}
+  rotularTabelas();
+  atualizarPrev();
+  pedirNomes();
+}
+function rotularTabelas(){
+  app.querySelectorAll(".tablewrap table").forEach(t=>{
+    const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim());
+    t.querySelectorAll("tbody tr, tfoot tr").forEach(tr=>{let i=0;[...tr.children].forEach(td=>{if(hs[i])td.setAttribute("data-label",hs[i]);i+=td.colSpan||1})});
+  });
+}
+
+function page(){
+  const c=S.config,atual=S.mes===hojeMes();
+  let out=`<header class="top">
+    <div class="brand"><div class="eyebrow">Livro de caixa da casa · <span class="chip ${S.tes?"good":"neutral"}" style="text-transform:none;letter-spacing:0">${S.me.admin?"administrador":S.tes?"tesoureiro":"membro"}</span></div><h1>${h(c.nome||DEF.nome)}</h1>
+      <div class="quem">${S.me.foto?`<img class="avatar sm" src="${h(S.me.foto)}" alt="" referrerpolicy="no-referrer">`:""}<span>${h(S.me.nome)}</span><button class="linkbtn" data-act="sair">Sair</button></div></div>
+    <div class="monthnav">
+      <button class="iconbtn" data-act="mes" data-n="-1" aria-label="Mês anterior">‹</button>
+      <div class="mlabel">${nomeMes(S.mes)}</div>
+      <button class="iconbtn" data-act="mes" data-n="1" aria-label="Mês seguinte">›</button>
+      ${atual?"":'<button class="linkbtn" data-act="hoje">Ir para este mês</button>'}
+    </div></header>
+  <nav class="tabs" role="tablist">${TABS.map(([k,l,c],i)=>`${i===2?'<span class="tab-sep" aria-hidden="true"></span>':""}<button class="tab${i>=2?" sec":""}" role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}"><span class="l-long">${l}</span><span class="l-short">${c}</span></button>`).join("")}</nav>`;
+  if(S.tab!=="resumo")out+=`<button class="linkbtn voltar" data-act="tab" data-t="resumo">← Voltar ao resumo</button>`;
+  const fn={resumo:tResumo,rendas:tRendas,fundo:tFundo,historico:tHistorico,definicoes:tDefinicoes}[S.tab];
+  return out+`<main class="stack">${fn()}</main>`+(S.verFoto?`<div class="lightbox" data-act="foto-fechar" role="dialog" aria-label="Talão"><img src="${h(S.verFoto)}" alt="Foto do talão"><button class="btn" data-act="foto-fechar">Fechar</button></div>`:"");
+}
+
+/* movement row */
+function descMov(x){
+  if(x.tipo==="compra")return x.descricao||"Compras";
+  if(x.tipo==="conta")return (x.categoria||"Conta")+(x.descricao?" — "+x.descricao:"");
+  if(x.tipo==="renda")return "Renda — "+(x.moradorNome||"?");
+  if(x.tipo==="fundo")return x.descricao||(x.sentido==="entrada"?"Entrada no fundo":"Saída do fundo");
+  return "";
+}
+function linhaMov(x,opts){
+  opts=opts||{};
+  if(opts.compacto){
+    const ent=x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido==="entrada");
+    return `<li class="mov${x.anulado?" anulado":""}"><div><div class="mov-desc">${h(descMov(x))}</div><div class="mov-meta"><span>${dataCurta(x.data)}${x.moradorNome&&x.tipo!=="renda"?" · "+h(x.moradorNome):""}</span>${x.fotos&&x.fotos.length?"<span>· com talão</span>":""}${x.anulado?'<span class="chip bad">anulado</span>':""}</div></div><div class="mov-val${ent?" in":""}">${ent?"+":""}${eur(x.cent)}</div></li>`;
+  }
+  const meta=[];
+  meta.push(dataCurta(x.data));
+  if(opts.tipo)meta.push({compra:"Compra",conta:"Conta",renda:"Renda",fundo:"Fundo"}[x.tipo]);
+  if(x.tipo==="compra"&&x.moradorNome)meta.push("comprou "+h(x.moradorNome));
+  if(x.tipo==="conta"&&x.mes!==(x.data||"").slice(0,7))meta.push("refere-se a "+nomeMesCurto(x.mes));
+  if(x.tipo==="renda"&&x.mes!==(x.data||"").slice(0,7))meta.push("renda de "+nomeMesCurto(x.mes));
+  let chip="";
+  if(x.tipo==="compra"||x.tipo==="conta"){
+    if(x.pagoPor==="fundo")meta.push("pago com o fundo");
+    else chip=x.reembolsado?`<span class="chip good">pago em dinheiro a ${h(x.moradorNome||"?")}</span>`:`<span class="chip warn">descontado na renda de ${nomeMesCurto(x.mes)} de ${h(x.moradorNome||"?")}</span>`;
+  }
+  if(x.tipo==="fundo")meta.push(x.sentido==="entrada"?"entrada":"saída");
+  const quem=x.criadoPor&&S.names[x.criadoPor];
+  if(quem)meta.push("registado por "+h(quem));
+  if(x.anulado){const q=x.anuladoPor&&S.names[x.anuladoPor];chip+=`<span class="chip bad">anulado${q?" por "+h(q):""}</span>`}
+  const entrada=x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido==="entrada");
+  let acts="";
+  const c=S.confirm;
+  if(c&&c.id===x.id){
+    acts=`<div class="confirm">${c.act==="anular"?"Anular este registo? Continua visível, riscado, e deixa de contar.":"Dar "+eur(x.cent)+" em dinheiro do fundo a "+h(x.moradorNome||"esta pessoa")+"? Deixa de ser descontado na renda de "+nomeMes(x.mes).toLowerCase()+"."}
+      <button class="btn small ${c.act==="anular"?"danger":"primary"}" data-act="conf-sim">${c.act==="anular"?"Sim, anular":"Sim, pagar em dinheiro"}</button>
+      <button class="btn small" data-act="conf-nao">Cancelar</button></div>`;
+  }else if(S.canWrite&&!x.anulado){
+    if(gere()&&eBolso(x)&&!x.reembolsado&&x.mes>=addMes(hojeMes(),-1))acts+=`<button class="btn small" data-act="reemb" data-id="${x.id}">Pagar em dinheiro</button>`;
+    if((x.tipo==="compra"||x.tipo==="conta")&&podeFotos()&&(gere()||(eMeu(x)&&x.tipo==="compra")))acts+=`<button class="linkbtn" data-act="foto-add" data-alvo="mov:${x.id}">${x.fotos&&x.fotos.length?"Juntar outro talão":"Juntar talão"}</button>`;
+    if(podeAnular(x))acts+=`<button class="linkbtn" data-act="anular" data-id="${x.id}">Anular</button>`;
+  }
+  return `<li class="mov${x.anulado?" anulado":""}">
+    <div><div class="mov-desc">${h(descMov(x))}</div><div class="mov-meta">${meta.filter(Boolean).map(m=>`<span>${m}</span>`).join("")}${chip}</div>${fotosMov(x)}</div>
+    <div class="mov-val${entrada?" in":""}">${entrada?"+":""}${eur(x.cent)}</div>
+    ${acts?`<div class="mov-actions">${acts}</div>`:""}</li>`;
+}
+function lista(items,vazio,opts){
+  if(!items.length)return `<div class="empty">${vazio}</div>`;
+  return `<ul class="movs">${items.map(x=>linhaMov(x,opts)).join("")}</ul>`;
+}
+
+/* shared form bits */
+function optsMoradores(m,incluirVazio){
+  const rs=S.moradores.filter(r=>ativoEm(r,m));
+  let o=incluirVazio?'<option value="">—</option>':"";
+  return o+rs.map(r=>`<option value="${h(r.id)}"${r.id===S.eu?" selected":""}>${h(r.nome)}</option>`).join("");
+}
+/* quem comprou/pagou: toda a gente com acesso, começando por quem está a registar */
+function optsQuem(m){
+  const pes=S.users.filter(u=>!u.bloqueado&&u.tipo!=="pendente").sort((a,b)=>a.nome.localeCompare(b.nome,"pt"));
+  return '<option value="">—</option>'+pes.map(u=>`<option value="${h(u.id)}"${u.id===S.me.id?" selected":""}>${h(u.nome)}</option>`).join("");
+}
+function dataDefault(){return S.mes===hojeMes()?hoje():S.mes+"-01"}
+function optsMeses(sel){let o="";for(let i=-6;i<=2;i++){const m=addMes(sel,i);o+=`<option value="${m}"${i===0?" selected":""}>${nomeMes(m)}</option>`}return o}
+const btnGuardar=l=>`<button class="btn primary" type="submit"${S.saving?" disabled":""}>${l}</button>`;
+
+/* ---------- tabs ---------- */
+function tResumo(){
+  const m=S.mes,vis=vivos(),st=stats(m,vis),atual=m===hojeMes();
+  const resta=st.plafond-st.compras,pct=st.plafond?st.compras/st.plafond:0;
+  const dias=diasNoMes(m),dia=+hoje().slice(8,10),pace=atual?dia/dias:(m<hojeMes()?1:0);
+  const cls=pct>1?"bad":(pct>.85||(atual&&pct>pace+.08))?"warn":"";
+  let ritmo="";
+  if(st.plafond&&atual&&resta>0)ritmo=`cerca de <b>${eur(Math.floor(resta/(dias-dia+1)))}</b> por dia até ao fim do mês`;
+  else if(st.plafond&&atual)ritmo="o plafond deste mês acabou";
+  else if(st.plafond&&m<hojeMes())ritmo=resta>=0?"mês fechado dentro do plafond":"mês fechado acima do plafond";
+  const rf=S.resumoForm;
+  const botoes=S.canWrite?`<div class="hero-acoes">
+      <button class="btn primary grande" data-act="resumo-form" data-f="compra" aria-pressed="${rf==="compra"}">+ Registar compra</button>
+      ${gere()?`<button class="btn grande" data-act="resumo-form" data-f="conta" aria-pressed="${rf==="conta"}">+ Registar conta</button>`:""}</div>`:"";
+  const hero=`<div class="card hero">
+    <div class="eyebrow">Plafond de compras · ${nomeMes(m)}</div>
+    ${st.plafond?`<div class="big${resta<0?" over":""}">${eur(Math.abs(resta))}<small>${resta>=0?"ainda por gastar":"acima do plafond"}</small></div>
+    <div class="bar" role="img" aria-label="Gasto ${Math.round(pct*100)}% do plafond"><div class="fill ${cls}" style="width:${Math.min(100,pct*100).toFixed(1)}%"></div>${atual?`<div class="pace" style="left:calc(${(pace*100).toFixed(1)}% - 1px)" title="A linha fina marca onde devíamos ir hoje"></div>`:""}</div>
+    <div class="bar-legend"><span>Gasto <b>${eur(st.compras)}</b> de ${eur(st.plafond)}</span>${ritmo?`<span>${ritmo}</span>`:""}</div>`
+    :`<div class="big">${eur(st.compras)}<small>gastos em compras</small></div><div class="hint">Ainda não há plafond definido.${gere()?' <button class="linkbtn" data-act="tab" data-t="definicoes">Definir plafond</button>':""}</div>`}
+    ${botoes}</div>`;
+  const formAberto=rf==="compra"?formCompra(true):rf==="conta"?formConta(true):"";
+
+  let setup="";
+  if(gere()){
+    const passos=[[S.config._existe,"Definir o plafond mensal e o saldo atual do fundo de maneio","definicoes"],[S.moradores.length>0,S.me.admin?"Aprovar as pessoas da casa (moradores e comensais) em Definições":"O administrador aprovar as pessoas da casa","definicoes"],[rendaTotal(hojeMes())!=null,"Pôr o valor total da renda da casa deste mês","rendas"]];
+    if(passos.some(p=>!p[0]))setup=`<div class="card"><h2>Para começar</h2><ul class="checklist">${passos.map(p=>`<li><span class="dot${p[0]?" done":""}">${p[0]?"✓":""}</span><span>${p[1]}</span>${p[0]?"":`<button class="linkbtn" data-act="tab" data-t="${p[2]}">Fazer agora</button>`}</li>`).join("")}</ul></div>`;
+  }
+
+  let registos;
+  if(!S.verTodos){
+    const doMes=allMovs().filter(x=>x.mes===m).sort(ordem);
+    registos=`<div class="card" id="registos"><div class="section-head"><h2>Últimos registos</h2>${doMes.length>5?`<button class="linkbtn" data-act="ver-todos">Ver todos (${doMes.length})</button>`:""}</div>
+      ${lista(doMes.slice(0,5),"Ainda não há nada registado este mês.",{compacto:true})}</div>`;
+  }else{
+    const F=[["tudo","Tudo"],["compra","Compras"],["conta","Contas"],["renda","Rendas"],["fundo","Fundo"]];
+    const doMes=allMovs().filter(x=>x.mes===m&&(S.filtro==="tudo"||x.tipo===S.filtro)).sort(ordem);
+    const totalF=S.filtro!=="tudo"&&doMes.length?`<div class="total-row"><span>Total</span><span class="num">${eur(sum(doMes.filter(x=>!x.anulado)))}</span></div>`:"";
+    registos=`<div class="card" id="registos"><div class="section-head"><h2>Registos de ${nomeMes(m).toLowerCase()}</h2><button class="linkbtn" data-act="ver-menos">Mostrar menos</button></div>
+      <div class="filtros" role="group" aria-label="Filtrar registos" style="margin-bottom:6px">${F.map(([k,l])=>`<button class="filtro" data-act="filtro" data-f="${k}" aria-pressed="${S.filtro===k}">${l}</button>`).join("")}</div>
+      ${lista(doMes,S.filtro==="tudo"?"Ainda não há nada registado neste mês.":"Nada deste tipo registado neste mês.",{tipo:S.filtro==="tudo"})}${totalF}</div>`;
+  }
+
+  const numeros=`<div class="card numeros"><div class="eyebrow">${nomeMes(m)} em números</div><div class="nums">
+    <button class="num-item" data-act="filtro" data-f="conta"><span>Contas da casa</span><b>${eur(st.contas)}</b></button>
+    <button class="num-item" data-act="tab" data-t="rendas"><span>Rendas por receber</span><b>${eur(st.ativos.reduce((t,r)=>t+rendaDe(r,m,vis).falta,0))}</b><small>já recebidos ${eur(st.rendasRec)}</small></button>
+    <button class="num-item" data-act="tab" data-t="fundo"><span>Fundo de maneio</span><b${st.saldo<0?' style="color:var(--bad)"':""}>${eur(st.saldo)}</b></button></div></div>`;
+
+  return cardEu(m,vis)+setup+hero+formAberto+registos+numeros;
+}
+
+/* "a minha renda": a pessoa que entrou, se fizer parte da casa neste mês */
+function cardEu(m,vis){
+  const r=pessoasCasa(m).find(x=>x.id===S.me.id);
+  if(!r)return "";
+  const d=rendaDe(r,m,vis),total=rendaTotal(m);
+  let corpo;
+  if(total==null&&!d.antes&&!d.pago&&!d.desconto)corpo=`<div class="hint">A renda de ${nomeMes(m).toLowerCase()} ainda não foi definida pelo tesoureiro.</div>`;
+  else corpo=`<div class="eu-num">
+      <div><span>A tua renda</span><b${d.devido<0?' style="color:var(--good)"':""}>${d.devido<0?"−"+eur(-d.devido):eur(d.devido)}</b></div>
+      <div><span>Já pagaste</span><b>${eur(d.pago)}</b></div>
+      <div><span>${d.aFavor?"A teu favor":"Falta pagar"}</span><b style="color:${d.falta?"var(--bad)":"var(--good)"}">${eur(d.falta||d.aFavor)}</b></div></div>
+    ${d.desconto?`<div class="hint">Já tem descontados <b>${eur(d.desconto)}</b> de coisas que pagaste do teu bolso este mês.${d.devido<0?" Como passa do valor da renda, a casa fica a dever-te a diferença.":""} Se precisares do dinheiro, fala com o tesoureiro.</div>`:""}
+    ${d.antes?`<div class="hint">Inclui ${d.antes>0?eur(d.antes)+" que ficou por pagar":eur(-d.antes)+" pagos a mais"} em meses anteriores.</div>`:""}`;
+  return `<div class="card eu"><div class="section-head"><h2>Olá, ${h(r.nome.split(" ")[0])}</h2><span class="chip ${d.estado[0]}">${d.estado[1]}</span></div>${corpo}
+    <div class="eu-links"><button class="linkbtn" data-act="tab" data-t="rendas">Ver a renda de todos</button></div></div>`;
+}
+
+function cardReembolsos(){
+  const pr=porReembolsar();if(!pr.pend.length)return "";
+  return `<div class="card"><div class="section-head"><h2>Pagas do próprio bolso</h2><span class="muted num">${eur(sum(pr.pend))}</span></div>
+    <div class="hint">Estão descontadas na renda do mês em que foram feitas. Se a pessoa precisar do dinheiro, carrega em «Pagar em dinheiro» e deixa de ser descontado.</div>
+    ${lista(pr.pend.slice().sort(ordem),"",{tipo:true})}</div>`;
+}
+
+/* ---------- fotos dos talões ---------- */
+const TIPOS_FOTO=["image/jpeg","image/png","image/webp","image/gif","application/pdf"];
+const srcFoto=f=>"/api/fotos/"+encodeURIComponent(f.id);
+const podeFotos=()=>S.canWrite;
+function carregarImg(url){return new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=url})}
+/* reduz a foto para no máximo 1600px (JPEG) antes de enviar */
+async function comprimir(file){
+  if(file.type==="application/pdf")return file;
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await carregarImg(url),esc=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));
+    const cv=document.createElement("canvas");cv.width=Math.round(img.naturalWidth*esc);cv.height=Math.round(img.naturalHeight*esc);
+    cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+    const b=await new Promise(r=>cv.toBlob(r,"image/jpeg",.82));
+    if(b&&(b.size<file.size||!TIPOS_FOTO.includes(file.type)))return b;
+    if(TIPOS_FOTO.includes(file.type))return file;
+  }catch(e){if(TIPOS_FOTO.includes(file.type))return file}
+  finally{URL.revokeObjectURL(url)}
+  throw {code:"unsupported_type"};
+}
+async function enviarFotos(files){
+  const out=[];
+  for(const f of files){
+    const b=await comprimir(f),fd=new FormData();
+    fd.append("foto",b,b===f?f.name:"talao.jpg");
+    const r=await fetch("/api/fotos",{method:"POST",body:fd,credentials:"same-origin"});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw {code:r.status===413?"too_large":r.status===415?"unsupported_type":"erro",message:j.erro};
+    out.push({id:j.id,pdf:j.pdf});
+  }
+  return out;
+}
+function erroFoto(e){
+  const c=e&&e.code;
+  toast("err",c==="too_large"?"A foto é grande demais (máximo 12 MB).":c==="unsupported_type"?"Esse ficheiro não dá. Usa uma foto (JPG, PNG) ou um PDF.":c==="quota_or_state"?"Acabou o espaço para fotos desta app.":c==="rate_limited"?"Muitas fotos seguidas. Espera um pouco e tenta outra vez.":"Não foi possível enviar a foto. Tenta outra vez.");
+}
+/* envia as fotos escolhidas no formulário; devolve null se falhar */
+async function fotosDoForm(alvo){
+  const fs=S.fotos[alvo];if(!fs.length)return [];
+  S.saving=true;schedule();
+  try{return await enviarFotos(fs.map(f=>f.file))}
+  catch(e){erroFoto(e);return null}
+  finally{S.saving=false;schedule()}
+}
+function limparFotos(alvo){S.fotos[alvo].forEach(f=>{try{URL.revokeObjectURL(f.url)}catch(e){}});S.fotos[alvo]=[]}
+function blocoFotos(alvo){
+  if(!podeFotos())return "";
+  const fs=S.fotos[alvo];
+  return `<div class="fld wide"><span>Foto do talão (opcional)</span><div class="fotos-row">${fs.map((f,i)=>`<span class="thumb">${f.pdf?'<span class="thumb-pdf">PDF</span>':`<img src="${f.url}" alt="Talão ${i+1}">`}<button type="button" class="thumb-x" data-act="foto-tirar" data-alvo="${alvo}" data-i="${i}" aria-label="Tirar esta foto">×</button></span>`).join("")}${fs.length<4?`<button type="button" class="btn" data-act="foto-add" data-alvo="${alvo}">${fs.length?"Juntar outra":"Tirar ou escolher foto"}</button>`:""}</div></div>`;
+}
+function fotosMov(x){
+  if(!x.fotos||!x.fotos.length)return "";
+  return `<div class="mov-fotos">${x.fotos.map((f,i)=>{const src=h(srcFoto(f));return f.pdf?`<a class="thumb-pdf sm" href="${src}" target="_blank" rel="noopener">PDF</a>`:`<button type="button" class="thumb-btn" data-act="foto-ver" data-src="${src}" aria-label="Ver talão ${i+1}"><img src="${src}" alt="" loading="lazy"></button>`}).join("")}</div>`;
+}
+
+/* formulários de compra e conta (usados no Resumo e nos separadores) */
+function formCompra(noResumo){
+  const m=S.mes;
+  return `<form class="card form" data-form="compra" autocomplete="off"><h3>Registar compra</h3>
+    <div class="grid">
+      <label class="fld wide"><span>O que se comprou / onde</span><input id="f-c-desc" maxlength="120" placeholder="Ex.: Mercado, fruta e legumes da semana"></label>
+      <label class="fld"><span>Valor (€)</span><input id="f-c-valor" inputmode="decimal" placeholder="0,00" required></label>
+      <label class="fld"><span>Data</span><input id="f-c-data" type="date" value="${dataDefault()}" required></label>
+      ${gere()?`<label class="fld"><span>Quem comprou</span><select id="f-c-quem">${optsQuem(m)}</select></label>`:""}
+      <label class="fld"><span>Pago com</span><select id="f-c-pago"><option value="bolso" selected>Do meu bolso (desconta na minha renda)</option><option value="fundo">Dinheiro do fundo de maneio</option></select></label>
+      ${blocoFotos("c")}
+    </div>
+    <div class="form-foot">${btnGuardar("Guardar compra")}${noResumo?'<button type="button" class="btn" data-act="resumo-fechar">Cancelar</button>':""}<span class="hint">Conta para o plafond do mês da data.</span></div></form>`;
+}
+function formConta(noResumo){
+  const m=S.mes;
+  return `<form class="card form" data-form="conta" autocomplete="off"><h3>Registar conta</h3>
+    <div class="grid">
+      <label class="fld"><span>Tipo</span><select id="f-k-tipo">${tiposConta().map(t=>`<option>${h(t)}</option>`).join("")}</select></label>
+      <label class="fld"><span>Valor (€)</span><input id="f-k-valor" inputmode="decimal" placeholder="0,00" required></label>
+      <label class="fld wide"><span>Nota (opcional)</span><input id="f-k-desc" maxlength="120" placeholder="Ex.: fatura de agosto, contador 1234"></label>
+      <label class="fld"><span>Mês a que se refere</span><select id="f-k-mes">${optsMeses(m)}</select></label>
+      <label class="fld"><span>Data do pagamento</span><input id="f-k-data" type="date" value="${dataDefault()}" required></label>
+      <label class="fld"><span>Quem pagou</span><select id="f-k-quem">${optsQuem(m)}</select></label>
+      <label class="fld"><span>Pago com</span><select id="f-k-pago"><option value="fundo">Dinheiro do fundo de maneio</option><option value="bolso">Do meu bolso (desconta na minha renda)</option></select></label>
+      ${blocoFotos("k")}
+    </div>
+    <div class="form-foot">${btnGuardar("Guardar conta")}${noResumo?'<button type="button" class="btn" data-act="resumo-fechar">Cancelar</button>':""}</div></form>`;
+}
+
+/* ---------- tesoureiros: só eles mexem em rendas, fundo e definições; toda a gente vê e regista compras e contas ---------- */
+const gere=()=>S.canWrite&&S.tes;
+const SO_TES_FORMS=["conta","ajuste","renda","renda-total","previsao","fundo","config"];
+const SO_TES_ACTS=["ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir"];
+const semPermissao=()=>toast("err","Só os tesoureiros podem fazer isto.");
+const eMeu=x=>S.canWrite&&x.criadoPor===S.me.id;
+const podeAnular=x=>gere()||(eMeu(x)&&x.tipo==="compra");
+document.addEventListener("toggle",e=>{if(e.target.id==="det-prev")S.detAberto=e.target.open},true);
+
+/* calculadora da renda: previsão de cada conta + plafond, somada e dividida pelos moradores */
+/* linhas da calculadora: [id, nome, categoria de conta ou null, removida] — a comida (plafond) está sempre lá */
+function linhasPrev(m){
+  const pv=(S.config.previsaoMes||{})[m]||{};
+  return [["plafond","Comida (plafond de compras)",null,false]].concat(despesas().filter(d=>!d.removida||pv[d.id]).map(d=>[d.id,d.nome,d.semConta?null:catDe(d),!!d.removida]));
+}
+function realPrev(k,m,vis){
+  if(k==="plafond")return sum(vis.filter(x=>x.tipo==="compra"&&x.mes===m));
+  const d=despesas().find(x=>x.id===k);
+  if(!d||d.semConta)return null;
+  return sum(vis.filter(x=>x.tipo==="conta"&&x.mes===m&&x.categoria===catDe(d)));
+}
+function previsaoBase(m,vis){
+  const pm=S.config.previsaoMes||{};
+  if(pm[m])return {v:pm[m],origem:"Previsão guardada para este mês."};
+  const ks=Object.keys(pm).filter(k=>k<m).sort();
+  if(ks.length){
+    const k=ks[ks.length-1],v={plafond:plafondDe(m)};
+    despesas().forEach(d=>{if(!d.removida&&pm[k][d.id])v[d.id]=pm[k][d.id]});
+    return {v,origem:"Preenchido com a previsão de "+nomeMes(k).toLowerCase()+"."};
+  }
+  const p=addMes(m,-1),v={plafond:plafondDe(m)};
+  despesas().forEach(d=>{if(d.removida||d.semConta)return;const c=realPrev(d.id,p,vis);if(c)v[d.id]=c});
+  return {v,origem:Object.keys(v).length>1?"Preenchido com o que se gastou no mês passado.":""};
+}
+function cardPrevisao(m,vis){
+  const base=previsaoBase(m,vis),p=addMes(m,-1),ro=gere()?"":" disabled",regra=regraDe(m),temCom=S.moradores.some(eComensal);
+  let realTot=0;
+  const rows=linhasPrev(m).map(([k,l,,rem])=>{
+    const ant=realPrev(k,p,vis),real=realPrev(k,m,vis);if(real)realTot+=real;
+    const v=base.v[k],c=S.confirm;
+    let rm="";
+    if(gere()&&k!=="plafond"&&!rem)rm=c&&c.act==="desp-rm"&&c.id===k
+      ?`<span class="confirm">Remover «${h(l)}»? <button type="button" class="btn small danger" data-act="conf-sim">Remover</button><button type="button" class="btn small" data-act="conf-nao">Cancelar</button></span>`
+      :`<button type="button" class="rm" data-act="desp-rm" data-id="${h(k)}" aria-label="Remover ${h(l)}" title="Remover esta despesa">×</button>`;
+    return `<tr><td><div class="linha-nome"><span>${h(l)}${rem?' <span class="muted">(removida)</span>':""}${k==="plafond"?' <span class="muted" title="Está ligada ao plafond e às compras">· fixa</span>':""}</span>${rm}</div></td>${temCom?`<td class="c"><input type="checkbox" class="prev-com" id="f-pc-${h(k)}" data-k="${h(k)}"${regra.linhas.includes(k)?" checked":""}${ro} aria-label="Comensais pagam ${h(l)}"></td>`:""}<td class="r"><input id="f-p-${h(k)}" class="prev-in" data-k="${h(k)}" data-l="${h(l)}" inputmode="decimal" placeholder="0,00" value="${v?eurNum(v):""}" aria-label="${h(l)} previsto"${ro}></td><td class="r num muted">${ant?eur(ant):"—"}</td><td class="r num">${real?eur(real):"—"}</td></tr>`;
+  }).join("");
+  const add=gere()?`<div class="add-desp"><label class="fld"><span>Nova despesa</span><input id="f-d-nome" maxlength="40" placeholder="Ex.: Gás de botija, Limpeza das escadas"></label><button type="button" class="btn" data-act="desp-add">+ Adicionar despesa</button></div>`:"";
+  return `<form class="card form" data-form="previsao" autocomplete="off">
+    <div class="section-head"><h2>Calcular a renda do mês</h2><span class="hint">${base.origem}</span></div>
+    <div class="hint" style="margin-bottom:8px">Põe quanto esperas gastar em cada coisa. Podes adicionar despesas novas e remover as que não têm (×). A soma, dividida pelas pessoas da casa, dá quanto cada uma paga.</div>
+    <div class="tablewrap"><table class="prev"><thead><tr><th>O quê</th>${temCom?'<th class="c">Comensais pagam</th>':""}<th class="r">Previsto</th><th class="r">Mês passado</th><th class="r">Real este mês</th></tr></thead>
+    <tbody>${rows}</tbody><tfoot><tr><td>Total</td>${temCom?"<td></td>":""}<td class="r num" id="prev-total">—</td><td></td><td class="r num">${realTot?eur(realTot):"—"}</td></tr></tfoot></table></div>
+    ${add}
+    <div class="prev-res"><span>Total previsto <b class="num prev-cada" id="prev-total2">—</b></span><span id="prev-div"></span></div>
+    ${gere()?`<div class="form-foot">${btnGuardar("Usar como renda de "+nomeMes(m).toLowerCase())}<span class="hint">${temCom?"Marca na coluna «Comensais pagam» as despesas que os comensais dividem com os moradores (quem tem valor fixo paga só esse valor). ":""}Guarda a previsão, define a renda total do mês e, se mudaste o plafond, passa a ser o plafond de compras deste mês. As despesas novas aparecem também como tipo de conta.</span></div>`:""}
+  </form>`;
+}
+function lerPrev(){
+  const v={};let t=0,mau=false;
+  document.querySelectorAll(".prev-in").forEach(el=>{const x=el.value.trim();if(!x||x==="0")return;const c=parseValor(x);if(c==null)mau=el.dataset.l;else{v[el.dataset.k]=c;t+=c}});
+  const cs=document.querySelectorAll(".prev-com");
+  const linhas=cs.length?[...cs].filter(c=>c.checked).map(c=>c.dataset.k):regraDe(S.mes).linhas;
+  return {v,t,mau,regra:Object.assign(regraAtual(),{linhas,ajustes:ajustesDe(S.mes)})};
+}
+function atualizarPrev(){
+  if(!document.querySelector(".prev-in"))return;
+  const {v,t,mau,regra}=lerPrev(),tt=mau?"valor inválido":eur(t);
+  document.getElementById("prev-total").textContent=tt;document.getElementById("prev-total2").textContent=tt;
+  document.getElementById("prev-div").innerHTML=mau||!t?"":textoDivisao(divisao(t,v,S.mes,regra));
+}
+const _prev=e=>{const c=e.target.classList;if(c&&(c.contains("prev-in")||c.contains("prev-com")))atualizarPrev()};
+document.addEventListener("input",_prev);document.addEventListener("change",_prev);
+
+function tRendas(){
+  const m=S.mes,vis=vivos(),total=rendaTotal(m),ant=rendaTotal(addMes(m,-1));
+  const ativos=S.moradores.filter(r=>ativoEm(r,m));
+  const linhas=pessoasCasa(m).filter(r=>!r.entrada||r.entrada<=m).map(r=>({r,d:rendaDe(r,m,vis)}))
+    .filter(o=>ativoEm(o.r,m)||o.d.devido!==0||o.d.pago>0).sort((a,b)=>a.r.nome.localeCompare(b.r.nome,"pt"));
+  const senhorio=vis.find(x=>x.tipo==="conta"&&x.categoria==="Renda da casa"&&x.mes===m);
+  let topo=`<div class="card"><div class="section-head"><div><div class="eyebrow">Renda da casa · ${nomeMes(m)}</div>
+    <div class="big">${total!=null?eur(rendaEfetiva(m)):'<span class="muted" style="font-size:.6em">Por definir</span>'}</div></div>
+    <div>${senhorio?`<span class="chip good">Paga ao senhorio a ${dataCurta(senhorio.data)}</span>`:(total&&gere()?`<button class="btn small" data-act="senhorio">Registar pagamento ao senhorio (${eur(valorSenhorio(m))})</button>`:"")}</div></div>
+    <div class="hint">${total&&rendaEfetiva(m)!==total?`Com os acertos à mão; o valor calculado era ${eur(total)}. `:""}${total?textoDivisao(divisaoDe(m)):"Põe o valor total da renda deste mês para se calcular quanto cada pessoa tem de pagar."}${!senhorio&&total&&gere()?" O pagamento ao senhorio sai do fundo de maneio.":""}</div>`;
+  if(gere()){
+    const pre=total!=null?eurNum(total):(ant!=null?eurNum(ant):"");
+    topo+=`<form data-form="renda-total" class="form-foot" style="align-items:flex-end" autocomplete="off">
+      <label class="fld" style="max-width:240px"><span>Renda total deste mês (€)</span><input id="f-t-total" inputmode="decimal" placeholder="0,00" value="${pre}"></label>
+      ${btnGuardar(total!=null?"Atualizar valor":"Guardar renda do mês")}
+      ${total==null&&ant!=null?'<span class="hint">Preenchido com o valor do mês passado.</span>':""}</form>`;
+  }
+  topo+=`</div>`;
+  const t={parte:0,antes:0,desc:0,pagar:0,pago:0,falta:0},temDesc=linhas.some(o=>o.d.desconto);
+  const rows=linhas.map(({r,d})=>{
+    t.parte+=d.parte;t.antes+=d.antes;t.desc+=d.desconto;t.pagar+=d.devido;t.pago+=d.pago;t.falta+=d.falta;
+    let acao="";
+    if(gere()){
+      if(S.rendaEdit===r.id)acao=`<form data-form="renda" data-id="${h(r.id)}" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end" autocomplete="off">
+        <input id="f-r-valor" inputmode="decimal" value="${d.falta?eurNum(d.falta):""}" placeholder="Valor" aria-label="Valor pago" style="width:90px;height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)">
+        <input id="f-r-data" type="date" value="${dataDefault()}" aria-label="Data do pagamento" style="height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)">
+        <button class="btn small primary" type="submit"${S.saving?" disabled":""}>Guardar</button><button class="btn small" type="button" data-act="renda-fechar">Cancelar</button></form>`;
+      else acao=`<button class="btn small" data-act="renda-abrir" data-id="${h(r.id)}">Registar pagamento</button>`;
+    }
+    const antes=d.antes>0?`<span style="color:var(--bad)">+${eur(d.antes)}</span>`:d.antes<0?`<span style="color:var(--good)">−${eur(-d.antes)}</span>`:"—";
+    const falta=d.falta?eur(d.falta):d.aFavor?`<span style="color:var(--good)">${eur(d.aFavor)} a favor</span>`:"—";
+    return `<tr><td><b>${h(r.nome)}</b>${eComensal(r)?` <span class="chip neutral">${nomeTipo(r)}</span>`:""}${ativoEm(r,m)?"":' <span class="muted">(já saiu)</span>'}</td><td class="r num">${celulaParte(r,d,m)}</td><td class="r num">${antes}</td>${temDesc?`<td class="r num">${d.desconto?`<span style="color:var(--good)">−${eur(d.desconto)}</span>`:"—"}</td>`:""}<td class="r num"><b${d.devido<0?' style="color:var(--good)"':""}>${d.devido<0?"−"+eur(-d.devido):eur(d.devido)}</b></td><td class="r num">${eur(d.pago)}</td><td class="r num">${falta}</td><td><span class="chip ${d.estado[0]}">${d.estado[1]}</span></td><td class="r">${acao}</td></tr>`;
+  }).join("");
+  const tabela=linhas.length?`<div class="tablewrap"><table><thead><tr><th>Pessoa</th><th class="r">Parte do mês</th><th class="r">Vem de trás</th>${temDesc?'<th class="r">Compras a descontar</th>':""}<th class="r">A pagar</th><th class="r">Pago</th><th class="r">Falta</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${rows}</tbody><tfoot><tr><td>Total</td><td class="r num">${eur(t.parte)}</td><td class="r num">${t.antes>=0?eur(t.antes):"−"+eur(-t.antes)}</td>${temDesc?`<td class="r num">−${eur(t.desc)}</td>`:""}<td class="r num">${t.pagar<0?"−"+eur(-t.pagar):eur(t.pagar)}</td><td class="r num">${eur(t.pago)}</td><td class="r num">${eur(t.falta)}</td><td colspan="2"></td></tr></tfoot></table></div>
+    <div class="hint" style="margin-top:10px">${gere()?"<b>Alterar</b> muda à mão a parte de uma pessoa neste mês; os outros não mudam e a renda total do mês acompanha. ":""}<b>Vem de trás</b>: <span style="color:var(--bad)">+</span> é o que ficou por pagar nos meses anteriores e soma-se a este mês; <span style="color:var(--good)">−</span> é o que a pessoa pagou a mais e desconta-se agora.${temDesc?" <b>Compras a descontar</b>: o que a pessoa pagou do seu bolso neste mês. «A pagar» pode ficar negativo: nesse caso é a casa que deve à pessoa.":""}</div>`
+    :`<div class="empty">Não há pessoas registadas para este mês.${gere()?' <button class="linkbtn" data-act="tab" data-t="definicoes">Adicionar pessoas</button>':""}</div>`;
+  const pagos=allMovs().filter(x=>x.tipo==="renda"&&x.mes===m).sort(ordem);
+  const calc=gere()?cardPrevisao(m,vis):`<details class="card detalhes" id="det-prev"${S.detAberto?" open":""}><summary>Ver como se chegou ao valor da renda</summary>${cardPrevisao(m,vis)}</details>`;
+  return `<div class="card"><div class="section-head"><h2>Quanto paga cada pessoa · ${nomeMes(m)}</h2><span class="hint">${S.config.rendasNoFundo?"O que se paga entra no fundo de maneio.":"O que se paga não entra no fundo de maneio."}</span></div>${tabela}</div>
+    <div class="card"><h2 style="margin-bottom:6px">Pagamentos em ${nomeMes(m).toLowerCase()}</h2>${lista(pagos,"Ainda nenhum pagamento de renda neste mês.")}</div>
+    <h2 class="sub-sec">Tesouraria${gere()?"":' <span class="hint" style="font-family:var(--f-body);font-weight:400">· só o tesoureiro altera</span>'}</h2>`+topo+calc;
+}
+
+function tFundo(){
+  const m=S.mes,vis=vivos();
+  const inicio=saldoAte(addMes(m,-1),vis);
+  const ls=vis.filter(x=>x.mes===m&&efeito(x)!==0).sort((a,b)=>-ordem(a,b));
+  let s=inicio,ent=0,sai=0;
+  const rows=ls.map(x=>{const e=efeito(x);s+=e;if(e>0)ent+=e;else sai-=e;
+    return `<tr><td class="num">${dataCurta(x.data)}</td><td>${h(descMov(x))}${x.tipo==="compra"?' <span class="muted">· compra</span>':x.tipo==="conta"?' <span class="muted">· conta</span>':""}${(x.tipo==="compra"||x.tipo==="conta")&&x.pagoPor==="bolso"?' <span class="muted">(pago em dinheiro)</span>':""}</td><td class="r num in">${e>0?eur(e):""}</td><td class="r num">${e<0?eur(-e):""}</td><td class="r num">${eur(s)}</td></tr>`}).join("");
+  const form=gere()?`<form class="card form" data-form="fundo" autocomplete="off"><h3>Entrada ou saída de dinheiro</h3>
+    <div class="grid">
+      <label class="fld"><span>Movimento</span><select id="f-f-sentido"><option value="entrada">Entrada (reforço, donativo, quota…)</option><option value="saida">Saída (levantamento, outra despesa…)</option></select></label>
+      <label class="fld"><span>Valor (€)</span><input id="f-f-valor" inputmode="decimal" placeholder="0,00" required></label>
+      <label class="fld wide"><span>Descrição</span><input id="f-f-desc" maxlength="120" placeholder="Ex.: Quota da associação, donativo, acerto de caixa" required></label>
+      <label class="fld"><span>Data</span><input id="f-f-data" type="date" value="${dataDefault()}" required></label>
+    </div>
+    <div class="form-foot">${btnGuardar("Guardar movimento")}<span class="hint">Compras, contas e rendas já entram aqui sozinhas.</span></div></form>`:"";
+  const manuais=allMovs().filter(x=>x.tipo==="fundo"&&x.mes===m).sort(ordem);
+  return cardReembolsos()+`<div class="card"><div class="section-head"><div><div class="eyebrow">Saldo do fundo de maneio no fim de ${nomeMes(m).toLowerCase()}</div><div class="big" ${s<0?'style="color:var(--bad)"':""}>${eur(s)}</div></div>
+      <div class="num muted" style="text-align:right;font-size:14px">entradas <span style="color:var(--good)">+${eur(ent)}</span><br>saídas −${eur(sai)}</div></div>
+    <div class="tablewrap"><table class="ledger"><thead><tr><th>Data</th><th>Descrição</th><th class="r">Entrada</th><th class="r">Saída</th><th class="r">Saldo</th></tr></thead>
+    <tbody><tr class="open"><td></td><td>Saldo que vinha do mês anterior</td><td></td><td></td><td class="r num">${eur(inicio)}</td></tr>${rows||'<tr><td colspan="5" class="empty">Sem movimentos no fundo neste mês.</td></tr>'}</tbody></table></div></div>
+    <div class="two">${form}<div class="card"><h2 style="margin-bottom:6px">Movimentos manuais</h2>${lista(manuais,"Nenhuma entrada ou saída manual neste mês.")}</div></div>`;
+}
+
+function tHistorico(){
+  const all=allMovs(),vis=vivos(),cur=hojeMes();
+  let min=S.config.anoInicio?S.config.anoInicio+"-01":cur,max=cur;
+  all.forEach(x=>{if(x.mes<min)min=x.mes;if(x.mes>max)max=x.mes});
+  const primeiro=all.length?all.reduce((a,x)=>x.mes<a?x.mes:a,cur):cur;
+  if(min<primeiro)min=primeiro;
+  if(S.moradores.length){const e=S.moradores.reduce((a,r)=>r.entrada&&r.entrada<a?r.entrada:a,min);if(e<min)min=e}
+  const meses=[];for(let m=max;m>=min;m=addMes(m,-1))meses.push(m);
+  const rows=meses.map(m=>{const st=stats(m,vis),resta=st.plafond-st.compras;
+    return `<tr class="clickable${m===S.mes?" sel":""}" data-act="ir-mes" data-m="${m}"><td><b>${nomeMes(m)}</b></td><td class="r num">${eur(st.plafond)}</td><td class="r num">${eur(st.compras)}</td><td class="r num" ${resta<0?'style="color:var(--bad)"':""}>${eur(resta)}</td><td class="r num">${eur(st.contas)}</td><td class="r num">${eur(st.rendasRec)} <span class="muted">/ ${eur(st.rendasEsp)}</span></td><td class="r num">${eur(st.saldo)}</td></tr>`}).join("");
+  const exp=true?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" data-act="exportar" data-q="mes">Exportar ${nomeMesCurto(S.mes)} (CSV)</button><button class="btn small" data-act="exportar" data-q="tudo">Exportar tudo (CSV)</button></div>`:"";
+  const todos=all.filter(x=>x.mes===S.mes).sort(ordem);
+  return `<div class="card"><div class="section-head"><h2>Resumo mês a mês</h2>${exp}</div>
+    <div class="hint" style="margin-bottom:8px">Carrega num mês para o abrir.</div>
+    <div class="tablewrap"><table><thead><tr><th>Mês</th><th class="r">Plafond</th><th class="r">Compras</th><th class="r">Sobrou</th><th class="r">Contas</th><th class="r">Rendas</th><th class="r">Fundo no fim</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div class="card"><h2 style="margin-bottom:6px">Todos os registos de ${nomeMes(S.mes).toLowerCase()}</h2>${lista(todos,"Sem registos neste mês.",{tipo:true})}</div>`;
+}
+
+function tDefinicoes(){
+  const c=S.config,m=S.mes,pm=(c.plafondMes||{})[m];
+  if(!gere())return membrosCard()+`<div class="card"><h2>Definições</h2><div class="breakdown" style="margin-top:10px"><div><span>Plafond mensal de compras</span><span class="num">${eur(c.plafond)}</span></div><div><span>Saldo inicial do fundo</span><span class="num">${eur(c.fundoInicial)}</span></div></div></div>`;
+  return membrosCard()+`<form class="card form" data-form="config" autocomplete="off"><h3>A casa e o dinheiro</h3>
+    <div class="grid">
+      <label class="fld wide"><span>Nome da casa / associação</span><input id="f-s-nome" maxlength="80" value="${h(c.nome||"")}"></label>
+      <label class="fld"><span>Plafond mensal de compras (€)</span><input id="f-s-plafond" inputmode="decimal" value="${eurNum(c.plafond)}"></label>
+      <label class="fld"><span>Plafond só de ${nomeMes(m).toLowerCase()} (€)</span><input id="f-s-plafondmes" inputmode="decimal" placeholder="Igual ao mensal" value="${pm!=null?eurNum(pm):""}"></label>
+      <label class="fld"><span>Saldo inicial do fundo de maneio (€)</span><input id="f-s-inicial" inputmode="decimal" value="${eurNum(c.fundoInicial)}"></label>
+      <label class="check fld wide"><input type="checkbox" id="f-s-rendas"${c.rendasNoFundo?" checked":""}><span>As rendas pagas entram no fundo de maneio (o pagamento ao senhorio regista-se no separador Rendas)</span></label>
+    </div>
+    <div class="form-foot">${btnGuardar("Guardar definições")}<span class="hint">O saldo inicial é o dinheiro que havia no fundo quando começaram a usar esta página.</span></div></form>`;
+}
+/* ---------- membros (só o administrador aprova, muda o tipo e dá permissão de tesoureiro) ---------- */
+const NOMES_TIPO={pendente:"à espera",visitante:"visitante",morador:"morador",comensal:"comensal",meio:"meio comensal"};
+const OPC_TIPO=[["morador","Morador (vive cá)"],["comensal","Comensal (só come cá)"],["meio","Meio comensal (paga metade de um comensal)"],["visitante","Visitante (vê e regista compras, não paga renda)"]];
+function optsMesesTodos(sel,vazio){
+  let o=vazio?`<option value="">${vazio}</option>`:"";
+  for(let i=-24;i<=6;i++){const m=addMes(hojeMes(),i);o+=`<option value="${m}"${m===sel?" selected":""}>${nomeMes(m)}</option>`}
+  if(sel&&!o.includes(`value="${sel}"`))o=`<option value="${sel}" selected>${nomeMes(sel)}</option>`+o;
+  return o;
+}
+function avatar(u,cls){return u.foto?`<img class="avatar${cls?" "+cls:""}" src="${h(u.foto)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar vazio${cls?" "+cls:""}">${h((u.nome||"?").trim().charAt(0).toUpperCase())}</span>`}
+function linhaMembro(u,admin){
+  const com=u.tipo==="comensal"||u.tipo==="meio";
+  const chips=`<span class="chip ${u.tipo==="pendente"?"warn":u.tipo==="visitante"?"neutral":"good"}">${NOMES_TIPO[u.tipo]||u.tipo}${com&&u.valorFixo!=null?" · fixo "+eur(u.valorFixo):""}</span>${u.tesoureiro?'<span class="chip good">tesoureiro</span>':""}${u.admin?'<span class="chip neutral">admin</span>':""}${u.bloqueado?'<span class="chip bad">sem acesso</span>':""}`;
+  const periodo=u.tipo!=="pendente"&&u.tipo!=="visitante"&&(u.entrada||u.saida)?`<span class="muted">${u.entrada?"desde "+nomeMesCurto(u.entrada):""}${u.saida?" · saiu no fim de "+nomeMesCurto(u.saida):""}</span>`:"";
+  const aEditar=admin&&(S.editMembro===u.id||u.tipo==="pendente");
+  const topo=`<div class="membro-topo">${avatar(u)}<div class="membro-nome"><b>${h(u.nome)}</b>${admin&&u.email?`<span class="muted">${h(u.email)}</span>`:""}<div class="membro-chips">${chips}${periodo}</div></div>${admin&&!aEditar?`<button class="btn small" data-act="membro-editar" data-id="${h(u.id)}">Editar</button>`:""}</div>`;
+  if(!aEditar)return `<div class="membro">${topo}</div>`;
+  const p="f-u-"+u.id+"-",tipoAtual=u.tipo==="pendente"?"morador":u.tipo,c=S.confirm;
+  const recusar=c&&c.act==="membro-apagar"&&c.id===u.id
+    ?`<span class="confirm">Recusar e apagar o pedido de ${h(u.nome)}? <button type="button" class="btn small danger" data-act="conf-sim">Recusar</button><button type="button" class="btn small" data-act="conf-nao">Cancelar</button></span>`
+    :`<button type="button" class="btn danger" data-act="membro-apagar" data-id="${h(u.id)}">Recusar</button>`;
+  return `<div class="membro edit">${topo}<form data-form="membro" data-id="${h(u.id)}" class="grid" autocomplete="off">
+    <label class="fld"><span>Nome</span><input id="${p}nome" maxlength="80" value="${h(u.nome)}"></label>
+    <label class="fld"><span>Tipo</span><select id="${p}tipo">${OPC_TIPO.map(([t,l])=>`<option value="${t}"${t===tipoAtual?" selected":""}>${l}</option>`).join("")}</select></label>
+    <label class="fld"><span>Valor fixo por mês (comensais e meios)</span><input id="${p}fixo" inputmode="decimal" placeholder="Vazio = paga a sua parte" value="${u.valorFixo!=null?eurNum(u.valorFixo):""}"></label>
+    <label class="fld"><span>Na casa desde</span><select id="${p}entrada">${optsMesesTodos(u.entrada||S.mes,"")}</select></label>
+    <label class="fld"><span>Saiu no fim de</span><select id="${p}saida">${optsMesesTodos(u.saida||"","Ainda cá está")}</select></label>
+    <label class="check fld wide"><input type="checkbox" id="${p}tes"${u.tesoureiro?" checked":""}${u.admin?" disabled":""}><span>Tesoureiro: gere contas, rendas, fundo de maneio e definições${u.admin?" (o administrador é sempre tesoureiro)":""}</span></label>
+    ${u.admin||u.tipo==="pendente"?"":`<label class="check fld wide"><input type="checkbox" id="${p}bloq"${u.bloqueado?" checked":""}><span>Sem acesso: não consegue entrar na app (o histórico dela fica)</span></label>`}
+    <div class="form-foot fld wide">${btnGuardar(u.tipo==="pendente"?"Aprovar":"Guardar")}${u.tipo==="pendente"?recusar:'<button type="button" class="btn" data-act="membro-fechar">Cancelar</button>'}
+      <span class="hint">O tipo e o valor fixo contam a partir de ${nomeMes(S.mes).toLowerCase()}, o mês que estás a ver. Quem saiu da casa: põe o mês em «Saiu no fim de», não mudes o tipo.</span></div>
+  </form></div>`;
+}
+function membrosCard(){
+  const admin=!!S.me.admin;
+  const lista=S.users.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt"));
+  if(!admin){
+    const casa=lista.filter(u=>u.tipo!=="pendente"&&!u.bloqueado);
+    return `<div class="card"><div class="section-head"><h2>Pessoas da casa</h2><span class="hint">Quem aprova pessoas e escolhe os tesoureiros é o administrador.</span></div><div class="membros">${casa.map(u=>linhaMembro(u,false)).join("")}</div></div>`;
+  }
+  const pend=lista.filter(u=>u.tipo==="pendente"),ativos=lista.filter(u=>u.tipo!=="pendente"&&!u.bloqueado),bloq=lista.filter(u=>u.tipo!=="pendente"&&u.bloqueado);
+  return `<div class="card"><div class="section-head"><h2>Membros</h2><span class="hint">Quem entra com a conta Google fica à espera até o aprovares.</span></div>
+    ${pend.length?`<h3 class="sub-h">À espera de aprovação (${pend.length})</h3><div class="membros">${pend.map(u=>linhaMembro(u,true)).join("")}</div>`:`<div class="hint">Não há pedidos à espera. Para alguém se juntar, manda-lhe o endereço da app.</div>`}
+    <h3 class="sub-h">Com acesso (${ativos.length})</h3><div class="membros">${ativos.map(u=>linhaMembro(u,true)).join("")}</div>
+    ${bloq.length?`<h3 class="sub-h">Sem acesso (${bloq.length})</h3><div class="membros">${bloq.map(u=>linhaMembro(u,true)).join("")}</div>`:""}
+    <div class="form-foot"><a class="btn small" href="/api/copia-seguranca">Descarregar cópia de segurança</a><span class="hint">A cópia tem todos os registos; as fotos dos talões estão na pasta <code>dados/fotos</code> do servidor.</span></div></div>`;
+}
+
+/* ---------- names of who registered ---------- */
+function pedirNomes(){}
+
+/* ---------- writes ---------- */
+let toastT=0;
+function toast(t,txt){const el=document.getElementById("toast");el.className="toast "+t;el.textContent=txt;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},3800)}
+function falhou(e){
+  const st=e&&e.status;
+  if(st===401){toast("err","A tua sessão terminou. Entra outra vez.");setTimeout(()=>location.reload(),1500)}
+  else if(st===403)toast("err",(e&&e.message)||"Não tens permissão para fazer isto.");
+  else toast("err",(e&&e.message)||"Não foi possível gravar. Verifica a ligação e tenta outra vez.");
+  schedule();
+}
+async function api(metodo,url,corpo){
+  const r=await fetch(url,{method:metodo,credentials:"same-origin",headers:corpo?{"Content-Type":"application/json"}:{},body:corpo?JSON.stringify(corpo):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw {status:r.status,message:j.erro};
+  return j;
+}
+async function gravar(fn){
+  if(S.saving)return false;
+  S.saving=true;schedule();
+  try{await fn();await carregar();return true}
+  catch(e){falhou(e);return false}
+  finally{S.saving=false;schedule()}
+}
+function addMov(mov){return gravar(()=>api("POST","/api/movimentos",mov))}
+function patchMov(x,p){return gravar(()=>api("PATCH","/api/movimentos/"+encodeURIComponent(x.id),p))}
+function guardarConfig(p){return api("PUT","/api/config",p)}
+
+/* ---------- form handlers ---------- */
+const val=id=>{const el=document.getElementById(id);return el?el.value:""};
+const handlers={
+  async compra(){
+    const cent=parseValor(val("f-c-valor"));if(!cent)return toast("err","Escreve o valor, por exemplo 12,50");
+    const data=val("f-c-data");if(!data)return toast("err","Escolhe a data da compra");
+    const quem=gere()?val("f-c-quem"):S.me.id,pago=val("f-c-pago");
+    if(pago==="bolso"&&!quem)return toast("err","Diz quem pagou do bolso, para se saber a quem reembolsar");
+    const fotos=await fotosDoForm("c");if(fotos===null)return;
+    const ok=await addMov({tipo:"compra",mes:data.slice(0,7),data,cent,descricao:val("f-c-desc").trim(),morador:quem,moradorNome:nomeMorador(quem),pagoPor:pago,reembolsado:false,fotos});
+    if(ok){limparFotos("c");S.resumoForm=null;S.reset="f-c-";toast("ok",data.slice(0,7)===S.mes?"Compra guardada":"Compra guardada em "+nomeMes(data.slice(0,7)))}
+  },
+  async conta(){
+    const cent=parseValor(val("f-k-valor"));if(!cent)return toast("err","Escreve o valor, por exemplo 38,20");
+    const data=val("f-k-data");if(!data)return toast("err","Escolhe a data do pagamento");
+    const quem=val("f-k-quem"),pago=val("f-k-pago"),mes=val("f-k-mes")||S.mes;
+    if(pago==="bolso"&&!quem)return toast("err","Diz quem pagou do bolso, para se saber a quem reembolsar");
+    const fotos=await fotosDoForm("k");if(fotos===null)return;
+    const ok=await addMov({tipo:"conta",mes,data,cent,categoria:val("f-k-tipo"),descricao:val("f-k-desc").trim(),morador:quem,moradorNome:nomeMorador(quem),pagoPor:pago,reembolsado:false,fotos});
+    if(ok){limparFotos("k");S.resumoForm=null;S.reset="f-k-";toast("ok","Conta guardada em "+nomeMes(mes))}
+  },
+  async renda(form){
+    const id=form.dataset.id,cent=parseValor(val("f-r-valor"));if(!cent)return toast("err","Escreve o valor pago");
+    const data=val("f-r-data")||hoje();
+    const ok=await addMov({tipo:"renda",mes:S.mes,data,cent,morador:id,moradorNome:nomeMorador(id)});
+    if(ok){S.rendaEdit=null;S.reset="f-r-";toast("ok","Pagamento de renda guardado")}
+  },
+  async "renda-total"(){
+    const cent=parseValor(val("f-t-total"));if(!cent)return toast("err","Escreve o valor total da renda, por exemplo 950");
+    const rendaMes=Object.assign({},S.config.rendaMes||{});rendaMes[S.mes]=cent;
+    const divisaoMes=Object.assign({},S.config.divisaoMes||{});divisaoMes[S.mes]=Object.assign(regraAtual(),{linhas:regraDe(S.mes).linhas});
+    const p={rendaMes,divisaoMes,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
+    const ok=await gravar(()=>guardarConfig(p),()=>Object.assign(S.config,p));
+    if(ok){S.reset="f-t-";toast("ok","Renda de "+nomeMes(S.mes)+" guardada")}
+  },
+  async previsao(){
+    if(document.activeElement&&document.activeElement.id==="f-d-nome")return addDespesa();
+    const {v,t:total,mau,regra}=lerPrev();
+    if(mau)return toast("err","O valor de «"+mau+"» não é válido");
+    if(!total)return toast("err","Põe pelo menos um valor previsto");
+    const m=S.mes,previsaoMes=Object.assign({},S.config.previsaoMes||{}),rendaMes=Object.assign({},S.config.rendaMes||{});
+    previsaoMes[m]=v;rendaMes[m]=total;
+    const divisaoMes=Object.assign({},S.config.divisaoMes||{});divisaoMes[m]=regra;
+    const p={previsaoMes,rendaMes,divisaoMes,comensalLinhas:regra.linhas,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
+    if(v.plafond!=null&&v.plafond!==plafondDe(m)){const pm=Object.assign({},S.config.plafondMes||{});pm[m]=v.plafond;p.plafondMes=pm}
+    const ok=await gravar(()=>guardarConfig(p),()=>Object.assign(S.config,p));
+    if(ok){S.reset="f-p";S.reset2="f-t-";toast("ok","Renda de "+nomeMes(m)+" guardada: "+eur(total))}
+  },
+  async ajuste(form){
+    const id=form.dataset.id,x=val("f-a-valor").trim(),cent=x==="0"||x==="0,00"?0:parseValor(x);
+    if(cent==null)return toast("err","Escreve o valor, por exemplo 150");
+    const aj=JSON.parse(JSON.stringify(S.config.ajustesMes||{}));(aj[S.mes]=aj[S.mes]||{})[id]=cent;
+    const ok=await gravar(()=>guardarConfig({ajustesMes:aj}),()=>{S.config.ajustesMes=aj});
+    if(ok){S.ajusteEdit=null;toast("ok",nomeMorador(id)+" paga "+eur(cent)+" em "+nomeMes(S.mes).toLowerCase()+"; a renda total do mês foi ajustada")}
+  },
+  async fundo(){
+    const cent=parseValor(val("f-f-valor"));if(!cent)return toast("err","Escreve o valor");
+    const desc=val("f-f-desc").trim();if(!desc)return toast("err","Escreve uma descrição, para todos perceberem o movimento");
+    const data=val("f-f-data");if(!data)return toast("err","Escolhe a data");
+    const ok=await addMov({tipo:"fundo",mes:data.slice(0,7),data,cent,sentido:val("f-f-sentido"),descricao:desc});
+    if(ok){S.reset="f-f-";toast("ok","Movimento guardado")}
+  },
+  async config(){
+    const pl=val("f-s-plafond").trim(),plm=val("f-s-plafondmes").trim(),ini=val("f-s-inicial").trim();
+    const plafond=pl===""||pl==="0"?0:parseValor(pl);if(plafond==null)return toast("err","O plafond mensal tem de ser um valor, por exemplo 400");
+    let plafondMes=Object.assign({},S.config.plafondMes||{});
+    if(plm===""){delete plafondMes[S.mes]}else{const v=plm==="0"?0:parseValor(plm);if(v==null)return toast("err","O plafond do mês tem de ser um valor, ou fica vazio");plafondMes[S.mes]=v}
+    let fundoInicial=0;if(ini!==""&&ini!=="0"){const neg=ini.startsWith("-");const v=parseValor(ini.replace(/^-/,""));if(v==null)return toast("err","O saldo inicial tem de ser um valor");fundoInicial=neg?-v:v}
+    const p={nome:val("f-s-nome").trim()||DEF.nome,plafond,plafondMes,fundoInicial,rendasNoFundo:document.getElementById("f-s-rendas").checked,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
+    const ok=await gravar(()=>guardarConfig(p),()=>Object.assign(S.config,p));
+    if(ok){S.reset="f-s-";S.fresh=true;toast("ok","Definições guardadas")}
+  },
+  async membro(form){
+    if(!S.me.admin)return toast("err","Só o administrador gere os membros.");
+    const id=form.dataset.id,p="f-u-"+id+"-",u=S.users.find(x=>x.id===id);if(!u)return;
+    const nome=val(p+"nome").trim();if(!nome)return toast("err","O nome não pode ficar vazio");
+    const tipo=val(p+"tipo"),fx=val(p+"fixo").trim(),com=tipo==="comensal"||tipo==="meio";
+    let valorFixo=null;if(com&&fx!==""){valorFixo=fx==="0"||fx==="0,00"?0:parseValor(fx);if(valorFixo==null)return toast("err","O valor fixo tem de ser um valor, por exemplo 60")}
+    const entrada=val(p+"entrada")||null,saida=val(p+"saida")||null;
+    if(entrada&&saida&&saida<entrada)return toast("err","O mês de saída não pode ser antes do mês de entrada");
+    const tesEl=document.getElementById(p+"tes"),bloqEl=document.getElementById(p+"bloq");
+    const corpo={nome,tipo,valorFixo,entrada,saida,tesoureiro:tesEl?tesEl.checked:!!u.tesoureiro};
+    if(bloqEl)corpo.bloqueado=bloqEl.checked;
+    /* a regra de divisão já guardada muda só a partir do mês que estás a ver */
+    const dm=JSON.parse(JSON.stringify(S.config.divisaoMes||{}));let mudou=false;
+    const eraCasa=["morador","comensal","meio"].includes(u.tipo),fica=["morador","comensal","meio"].includes(tipo);
+    if(tipo!==u.tipo||valorFixo!==u.valorFixo)Object.keys(dm).forEach(k=>{if(k<S.mes)return;const d=dm[k];
+      d.comensais=(d.comensais||[]).filter(x=>x!==id);d.meios=(d.meios||[]).filter(x=>x!==id);d.fixos=d.fixos||{};delete d.fixos[id];
+      if(com){d.comensais.push(id);if(tipo==="meio")d.meios.push(id);if(valorFixo!=null)d.fixos[id]=valorFixo}
+      if(d.pessoas){d.pessoas=d.pessoas.filter(x=>x!==id);if(fica)d.pessoas.push(id)}
+      mudou=true});
+    const ok=await gravar(async()=>{await api("PATCH","/api/utilizadores/"+encodeURIComponent(id),corpo);if(mudou)await guardarConfig({divisaoMes:dm})});
+    if(ok){S.editMembro=null;toast("ok",u.tipo==="pendente"?nome+" foi aprovado":eraCasa!==fica||tipo!==u.tipo?"Guardado. Conta a partir de "+nomeMes(S.mes).toLowerCase():"Guardado")}
+  }
+};
+document.addEventListener("submit",e=>{const f=e.target.closest("form[data-form]");if(!f)return;e.preventDefault();if(SO_TES_FORMS.includes(f.dataset.form)&&!gere())return semPermissao();const fn=handlers[f.dataset.form];if(fn)fn(f)});
+
+async function addDespesa(){
+  const nome=val("f-d-nome").trim().replace(/\s+/g," ");if(!nome)return toast("err","Escreve o nome da despesa");
+  const lista=despesas().map(d=>Object.assign({},d)),igual=lista.find(d=>d.nome.toLowerCase()===nome.toLowerCase()||catDe(d).toLowerCase()===nome.toLowerCase());
+  if(igual&&!igual.removida)return toast("err","Já existe a despesa «"+igual.nome+"»");
+  if(igual)delete igual.removida;
+  else{const slug=nome.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,20)||"despesa";lista.push({id:slug+"-"+Math.random().toString(36).slice(2,6),nome})}
+  if(await gravar(()=>guardarConfig({despesas:lista}),()=>{S.config.despesas=lista})){S.reset="f-d-";toast("ok","Despesa «"+nome+"» adicionada")}
+}
+/* ---------- clicks ---------- */
+function ir(tab){S.tab=tab;S.confirm=null;S.rendaEdit=null;S.editMembro=null;S.resumoForm=null;S.verFoto=null;S.fresh=true;render();window.scrollTo({top:0})}
+function mudarMes(m){S.mes=m;S.confirm=null;S.rendaEdit=null;S.ajusteEdit=null;S.fresh=true;render()}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-act]");if(!b)return;
+  const a=b.dataset.act,id=b.dataset.id;
+  if(SO_TES_ACTS.includes(a)&&!gere())return semPermissao();
+  if(a==="tab")return ir(b.dataset.t);
+  if(a==="filtro"){S.filtro=b.dataset.f;S.verTodos=true;render();const el=document.getElementById("registos");if(el&&b.closest(".numeros"))el.scrollIntoView({behavior:"smooth"});return}
+  if(a==="ver-todos"){S.verTodos=true;S.filtro="tudo";return render()}
+  if(a==="ver-menos"){S.verTodos=false;S.filtro="tudo";return render()}
+  if(a==="sair"){await fetch("/api/sair",{method:"POST",credentials:"same-origin"}).catch(()=>{});location.reload();return}
+  if(a==="membro-editar"){S.editMembro=id;return render()}
+  if(a==="membro-fechar"){S.editMembro=null;return render()}
+  if(a==="membro-apagar"){S.confirm={act:a,id};return render()}
+  if(a==="mes")return mudarMes(addMes(S.mes,+b.dataset.n));
+  if(a==="hoje")return mudarMes(hojeMes());
+  if(a==="ir-mes"){S.mes=b.dataset.m;return ir("resumo")}
+  if(a==="desp-add")return addDespesa();
+  if(a==="foto-add"){S.anexoAlvo=b.dataset.alvo;anexo.click();return}
+  if(a==="foto-tirar"){const l=S.fotos[b.dataset.alvo],i=+b.dataset.i;if(l&&l[i]){try{URL.revokeObjectURL(l[i].url)}catch(e){}l.splice(i,1)}return render()}
+  if(a==="foto-ver"){S.verFoto=b.dataset.src;return render()}
+  if(a==="foto-fechar"){S.verFoto=null;return render()}
+  if(a==="resumo-form"){const f=b.dataset.f;if(f==="conta"&&!gere())return semPermissao();S.resumoForm=S.resumoForm===f?null:f;S.reset=f==="compra"?"f-c-":"f-k-";render();const el=document.getElementById(f==="compra"?"f-c-desc":"f-k-valor");if(el&&S.resumoForm)el.focus();return}
+  if(a==="resumo-fechar"){S.resumoForm=null;return render()}
+  if(a==="anular"||a==="reemb"||a==="desp-rm"){S.confirm={act:a,id};return render()}
+  if(a==="conf-nao"){S.confirm=null;return render()}
+  if(a==="conf-sim"){
+    const c=S.confirm;S.confirm=null;if(!c)return;
+    if(c.act==="desp-rm"){const lista=despesas().map(d=>d.id===c.id?Object.assign({},d,{removida:true}):Object.assign({},d)),d=lista.find(x=>x.id===c.id);
+      if(d&&await gravar(()=>guardarConfig({despesas:lista}),()=>{S.config.despesas=lista}))toast("ok","Despesa «"+d.nome+"» removida");return}
+    if(c.act==="membro-apagar"){const u=S.users.find(x=>x.id===c.id);if(u&&await gravar(()=>api("DELETE","/api/utilizadores/"+encodeURIComponent(u.id))))toast("ok","Pedido de "+u.nome+" recusado");return}
+    const x=allMovs().find(y=>y.id===c.id);if(!x)return render();
+    if(c.act==="anular"&&!podeAnular(x))return semPermissao();
+    if(c.act!=="anular"&&!gere())return semPermissao();
+    if(c.act==="anular"){if(await patchMov(x,{anulado:true}))toast("ok","Registo anulado")}
+    else if(await patchMov(x,{reembolsado:true}))toast("ok","Marcado como pago em dinheiro");
+    return;
+  }
+  if(a==="renda-abrir"){S.rendaEdit=id;S.reset="f-r-";render();const el=document.getElementById("f-r-valor");if(el)el.focus();return}
+  if(a==="renda-fechar"){S.rendaEdit=null;return render()}
+  if(a==="ajuste-abrir"){S.ajusteEdit=id;S.reset="f-a-";render();const el=document.getElementById("f-a-valor");if(el){el.focus();el.select()}return}
+  if(a==="ajuste-fechar"){S.ajusteEdit=null;return render()}
+  if(a==="ajuste-rm"){
+    const aj=JSON.parse(JSON.stringify(S.config.ajustesMes||{}));if(aj[S.mes]){delete aj[S.mes][id];if(!Object.keys(aj[S.mes]).length)delete aj[S.mes]}
+    if(await gravar(()=>guardarConfig({ajustesMes:aj}),()=>{S.config.ajustesMes=aj})){S.ajusteEdit=null;toast("ok","Voltou ao cálculo automático")}
+    return;
+  }
+  if(a==="senhorio"){
+    const t=valorSenhorio(S.mes);if(!t)return;
+    if(await addMov({tipo:"conta",mes:S.mes,data:dataDefault(),cent:t,categoria:"Renda da casa",descricao:"Pagamento ao senhorio",morador:"",moradorNome:"",pagoPor:"fundo",reembolsado:false}))toast("ok","Pagamento ao senhorio registado");
+    return;
+  }
+  if(a==="exportar")return exportar(b.dataset.q);
+});
+
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.verFoto){S.verFoto=null;render()}});
+const anexo=document.getElementById("anexo");
+anexo.addEventListener("change",async()=>{
+  const files=[...anexo.files];anexo.value="";const alvo=S.anexoAlvo;S.anexoAlvo=null;
+  if(!files.length||!alvo)return;
+  const bons=files.filter(f=>f.type.startsWith("image/")||f.type==="application/pdf");
+  if(bons.length<files.length)toast("err","Só dá para juntar fotos ou PDF.");
+  if(!bons.length)return;
+  if(alvo.startsWith("mov:")){
+    const x=allMovs().find(y=>y.id===alvo.slice(4));if(!x||S.saving)return;
+    S.saving=true;schedule();
+    let novas;try{novas=await enviarFotos(bons)}catch(e){erroFoto(e);return}finally{S.saving=false;schedule()}
+    if(await patchMov(x,{fotosNovas:novas.map(f=>f.id)}))toast("ok","Talão juntado");
+    return;
+  }
+  const l=S.fotos[alvo];if(!l)return;
+  bons.slice(0,4-l.length).forEach(f=>l.push({file:f,url:URL.createObjectURL(f),pdf:f.type==="application/pdf"}));
+  schedule();
+});
+
+/* ---------- export ---------- */
+async function exportar(q){
+  const cel=s=>{s=String(s==null?"":s);return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+  const itens=allMovs().filter(x=>q==="tudo"||x.mes===S.mes).sort((a,b)=>-ordem(a,b));
+  const linhas=[["Data","Mês","Tipo","Descrição","Pessoa","Pago com","Entrada","Saída","Efeito no fundo","Estado"].join(";")];
+  itens.forEach(x=>{const ent=x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido==="entrada");
+    const pago=x.tipo==="compra"||x.tipo==="conta"?(x.pagoPor==="fundo"?"fundo":"bolso"+(x.reembolsado?" (pago em dinheiro)":" (descontado na renda de "+nomeMes(x.mes).toLowerCase()+")")):"";
+    linhas.push([x.data,x.mes,{compra:"Compra",conta:"Conta",renda:"Renda",fundo:"Fundo"}[x.tipo],descMov(x),x.moradorNome||"",pago,ent?eurNum(x.cent):"",ent?"":eurNum(x.cent),eurNum(efeito(x)),x.anulado?"anulado":"válido"].map(cel).join(";"))});
+  const nome=(q==="tudo"?"caixa-da-casa-tudo":"caixa-da-casa-"+S.mes)+".csv";
+  const url=URL.createObjectURL(new Blob(["\ufeff"+linhas.join("\r\n")],{type:"text/csv;charset=utf-8"}));
+  const a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
+/* ---------- arranque: login com Google, aprovação e dados do servidor ---------- */
+function mostrar(html){app.innerHTML=`<div class="entrada">${html}</div>`}
+async function carregar(){
+  const r=await api("GET","/api/estado");
+  S.me=r.eu;S.users=r.utilizadores||[];
+  S.tes=!!(S.me.tesoureiro||S.me.admin);
+  S.moradores=S.users.filter(u=>["morador","comensal","meio"].includes(u.tipo)).map(u=>({id:u.id,nome:u.nome,tipo:u.tipo,valorFixo:u.valorFixo,entrada:u.entrada,saida:u.saida}));
+  S.names={};S.users.forEach(u=>{S.names[u.id]=u.nome});
+  S.config=Object.assign({},DEF,r.config||{},{_existe:!!(r.config&&Object.keys(r.config).length)});
+  S.movs={todos:r.movimentos||[]};
+  document.title=(S.config.nome||DEF.nome)+" · Caixa da Casa";
+  schedule();
+}
+let carregarT=0;
+function ouvir(){
+  if(!window.EventSource)return setInterval(()=>carregar().catch(()=>{}),30000);
+  const es=new EventSource("/api/eventos");
+  es.onmessage=()=>{clearTimeout(carregarT);carregarT=setTimeout(()=>carregar().catch(()=>{}),300)};
+  es.onerror=()=>{};
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)carregar().catch(()=>{})});
+}
+async function ecraEntrar(pub){
+  mostrar(`<div class="card entrada-card"><div class="eyebrow">Livro de caixa da casa</div><h1>${h(pub.nomeCasa)}</h1>
+    <p>Entra com a tua conta Google para veres o plafond, a tua renda e registares as compras da casa.</p>
+    <div id="g-botao" class="g-botao">${pub.googleClientId?'<span class="muted">A carregar o botão do Google…</span>':'<span class="muted">O servidor ainda não tem o login do Google configurado (falta GOOGLE_CLIENT_ID).</span>'}</div>
+    ${pub.devLogin?`<form data-dev class="grid dev" autocomplete="off"><div class="hint" style="grid-column:1/-1">Login de teste (só neste computador)</div>
+      <label class="fld"><span>Email</span><input id="d-email" type="email" required></label>
+      <label class="fld"><span>Nome</span><input id="d-nome"></label>
+      <div><button class="btn" type="submit">Entrar para testar</button></div></form>`:""}
+  </div>`);
+  const dev=app.querySelector("form[data-dev]");
+  if(dev)dev.addEventListener("submit",async e=>{e.preventDefault();try{await api("POST","/api/entrar/dev",{email:document.getElementById("d-email").value,nome:document.getElementById("d-nome").value});location.reload()}catch(err){toast("err",err.message||"Não deu para entrar")}});
+  if(!pub.googleClientId)return;
+  for(let i=0;i<100&&!(window.google&&google.accounts&&google.accounts.id);i++)await new Promise(r=>setTimeout(r,100));
+  const el=document.getElementById("g-botao");
+  if(!(window.google&&google.accounts&&google.accounts.id)){el.innerHTML='<span class="muted">Não foi possível carregar o login do Google. Verifica a ligação e recarrega a página.</span>';return}
+  google.accounts.id.initialize({client_id:pub.googleClientId,callback:async r=>{
+    try{await api("POST","/api/entrar/google",{credential:r.credential});location.reload()}
+    catch(err){toast("err",err.message||"Não foi possível entrar")}
+  }});
+  el.innerHTML="";
+  google.accounts.id.renderButton(el,{theme:"outline",size:"large",shape:"pill",text:"continue_with",locale:"pt-PT"});
+}
+function ecraEspera(eu,nomeCasa){
+  mostrar(`<div class="card entrada-card"><div class="eyebrow">Livro de caixa da casa</div><h1>${h(nomeCasa)}</h1>
+    <div class="membro-topo" style="margin:14px 0">${avatar(eu)}<div class="membro-nome"><b>${h(eu.nome)}</b><span class="muted">${h(eu.email||"")}</span></div></div>
+    <p>A tua conta está registada. Falta o administrador da casa aprovar-te; depois disso vês tudo aqui.</p>
+    <div class="form-foot"><button class="btn primary" data-act="recarregar">Já fui aprovado</button><button class="btn" data-act="sair">Sair</button></div></div>`);
+}
+document.addEventListener("click",e=>{if(e.target.closest('[data-act="recarregar"]'))location.reload()});
+async function arranque(){
+  let pub={nomeCasa:DEF.nome,googleClientId:"",devLogin:false};
+  try{pub=await api("GET","/api/publico")}catch(e){}
+  let eu;
+  try{eu=await api("GET","/api/eu")}
+  catch(e){if(e.status===401)return ecraEntrar(pub);return mostrar(`<div class="card entrada-card"><h1>Sem ligação</h1><p>Não foi possível falar com o servidor. Recarrega a página daqui a pouco.</p></div>`)}
+  if(!eu.aprovado)return ecraEspera(eu.eu,pub.nomeCasa);
+  try{await carregar()}catch(e){return mostrar(`<div class="card entrada-card"><h1>Erro</h1><p>${h(e.message||"Não foi possível carregar os dados.")}</p></div>`)}
+  S.loading=false;S.fresh=true;render();
+  ouvir();
+}
+
+render();
+arranque();
+})();
+</script>
+</body>
+</html>
