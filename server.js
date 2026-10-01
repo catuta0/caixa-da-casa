@@ -1,7 +1,10 @@
 // Caixa da Casa — servidor.
 // Guarda tudo numa base de dados SQLite (pasta DATA_DIR) e as fotos dos talões em DATA_DIR/fotos.
-// As permissões são verificadas aqui, no servidor: pendentes não veem nada, membros só registam
-// compras (e anulam/juntam talões às suas), tesoureiros fazem o resto, e o admin gere os membros.
+//
+// Quem tem o link vê tudo e regista compras, sem conta (cada aparelho fica identificado por um
+// cookie, para poder anular ou juntar talões às compras que registou). Só os tesoureiros entram
+// com Google; um tesoureiro novo fica à espera até outro tesoureiro o aprovar, a não ser que ainda
+// não haja nenhum. As permissões são verificadas aqui, no servidor.
 
 import express from "express";
 import multer from "multer";
@@ -16,12 +19,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "dados"));
 const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || "").trim();
-const ADMIN_EMAILS = (process.env.ADMIN_EMAIL || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+// Emails aprovados logo como tesoureiros (opcional). ADMIN_EMAIL é o nome antigo.
+const TESOUREIROS_EMAILS = (process.env.TESOUREIRO_EMAIL || process.env.ADMIN_EMAIL || "")
+  .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
 const NOME_CASA = process.env.NOME_CASA || "Casa comunitária";
 const DEV_LOGIN = process.env.DEV_LOGIN === "1";
 const COOKIE_SECURE = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === "1" : process.env.NODE_ENV === "production";
 const SESSAO_DIAS = 60;
 const COOKIE = "caixa_sessao";
+const COOKIE_DISP = "caixa_disp";
 
 fs.mkdirSync(path.join(DATA_DIR, "fotos"), { recursive: true });
 const db = new DatabaseSync(path.join(DATA_DIR, "caixa.db"));
@@ -34,10 +40,14 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     nome TEXT NOT NULL,
     foto TEXT,
-    tipo TEXT NOT NULL DEFAULT 'pendente',
-    tesoureiro INTEGER NOT NULL DEFAULT 0,
-    admin INTEGER NOT NULL DEFAULT 0,
-    bloqueado INTEGER NOT NULL DEFAULT 0,
+    estado TEXT NOT NULL DEFAULT 'pendente',
+    aprovado_por TEXT,
+    criado_em TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS pessoas (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'morador',
     valor_fixo INTEGER,
     entrada TEXT,
     saida TEXT,
@@ -67,12 +77,36 @@ db.exec(`
   );
 `);
 
+// Migração da versão anterior (em que toda a gente tinha conta e um tipo):
+// os moradores/comensais passam para a tabela "pessoas" com o mesmo id, e os
+// administradores/tesoureiros ficam tesoureiros ativos.
+{
+  const cols = db.prepare("PRAGMA table_info(utilizadores)").all().map(c => c.name);
+  if (!cols.includes("estado")) db.exec("ALTER TABLE utilizadores ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendente'");
+  if (!cols.includes("aprovado_por")) db.exec("ALTER TABLE utilizadores ADD COLUMN aprovado_por TEXT");
+  if (cols.includes("tipo")) {
+    db.exec(`
+      INSERT OR IGNORE INTO pessoas (id, nome, tipo, valor_fixo, entrada, saida, criado_em)
+        SELECT id, nome, tipo, valor_fixo, entrada, saida, criado_em FROM utilizadores
+        WHERE tipo IN ('morador','comensal','meio');
+      UPDATE utilizadores SET estado = CASE
+        WHEN bloqueado = 1 THEN 'bloqueado'
+        WHEN admin = 1 OR tesoureiro = 1 THEN 'ativo'
+        ELSE 'pendente' END
+      WHERE estado = 'pendente';
+    `);
+    db.exec("DELETE FROM utilizadores WHERE estado = 'pendente' AND id IN (SELECT id FROM pessoas)");
+    for (const c of ["tipo", "tesoureiro", "admin", "bloqueado", "valor_fixo", "entrada", "saida"]) {
+      try { db.exec(`ALTER TABLE utilizadores DROP COLUMN ${c}`); } catch { /* versões antigas do SQLite: fica a coluna, não faz mal */ }
+    }
+  }
+}
+
 /* ---------- utilitários ---------- */
 const agora = () => new Date().toISOString();
 const novoId = () => crypto.randomBytes(12).toString("base64url");
 const hash = t => crypto.createHash("sha256").update(t).digest("hex");
-const TIPOS = ["pendente", "visitante", "morador", "comensal", "meio"];
-const APROVADOS = ["visitante", "morador", "comensal", "meio"];
+const TIPOS_PESSOA = ["morador", "comensal", "meio"];
 const reMes = /^\d{4}-(0[1-9]|1[0-2])$/;
 const reData = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const txt = (v, max) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -82,18 +116,15 @@ class ErroHttp extends Error {
 }
 const falha = (status, msg) => { throw new ErroHttp(status, msg); };
 
-const eAprovado = u => !!u && !u.bloqueado && (!!u.admin || APROVADOS.includes(u.tipo));
-const eTes = u => eAprovado(u) && (!!u.admin || !!u.tesoureiro);
+const eTes = u => !!u && u.estado === "ativo";
+const nAtivos = () => db.prepare("SELECT COUNT(*) AS n FROM utilizadores WHERE estado = 'ativo'").get().n;
 
-function utilPublico(u, completo) {
-  const p = {
-    id: u.id, nome: u.nome, foto: u.foto || null, tipo: u.tipo,
-    tesoureiro: !!(u.tesoureiro || u.admin), admin: !!u.admin, bloqueado: !!u.bloqueado,
-    valorFixo: u.valor_fixo ?? null, entrada: u.entrada || null, saida: u.saida || null,
-  };
+function tesPublico(u, completo) {
+  const p = { id: u.id, nome: u.nome, foto: u.foto || null, estado: u.estado };
   if (completo) { p.email = u.email; p.criadoEm = u.criado_em; }
   return p;
 }
+const pessoaPublica = p => ({ id: p.id, nome: p.nome, tipo: p.tipo, valorFixo: p.valor_fixo ?? null, entrada: p.entrada || null, saida: p.saida || null });
 
 function lerConfig() {
   const r = db.prepare("SELECT valor FROM config WHERE chave = 'casa'").get();
@@ -104,8 +135,9 @@ function gravarConfig(c) {
     .run(JSON.stringify(c));
 }
 const utilPorId = id => (typeof id === "string" && id ? db.prepare("SELECT * FROM utilizadores WHERE id = ?").get(id) : undefined);
+const pessoaPorId = id => (typeof id === "string" && id ? db.prepare("SELECT * FROM pessoas WHERE id = ?").get(id) : undefined);
 
-/* ---------- sessões ---------- */
+/* ---------- cookies, sessões e aparelhos ---------- */
 function lerCookie(req, nome) {
   for (const parte of (req.headers.cookie || "").split(";")) {
     const i = parte.indexOf("=");
@@ -113,50 +145,57 @@ function lerCookie(req, nome) {
   }
   return null;
 }
-function definirCookie(res, valor, maxAge) {
-  res.setHeader("Set-Cookie", `${COOKIE}=${valor}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${COOKIE_SECURE ? "; Secure" : ""}`);
+function definirCookie(res, nome, valor, maxAge) {
+  res.append("Set-Cookie", `${nome}=${valor}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${COOKIE_SECURE ? "; Secure" : ""}`);
 }
 function criarSessao(res, utilizadorId) {
   const token = crypto.randomBytes(32).toString("base64url");
   const expira = new Date(Date.now() + SESSAO_DIAS * 864e5).toISOString();
   db.prepare("INSERT INTO sessoes (token_hash, utilizador_id, expira) VALUES (?, ?, ?)").run(hash(token), utilizadorId, expira);
-  definirCookie(res, token, SESSAO_DIAS * 86400);
+  definirCookie(res, COOKIE, token, SESSAO_DIAS * 86400);
 }
-function autenticar(req, _res, next) {
+function identificar(req, res, next) {
+  // aparelho: identifica quem registou uma compra sem conta (para a poder anular ou juntar talões)
+  let d = lerCookie(req, COOKIE_DISP);
+  if (!d || !/^[A-Za-z0-9_-]{20,64}$/.test(d)) {
+    d = crypto.randomBytes(18).toString("base64url");
+    definirCookie(res, COOKIE_DISP, d, 2 * 365 * 86400);
+  }
+  req.disp = "d:" + hash(d).slice(0, 20);
   const token = lerCookie(req, COOKIE);
   if (token) {
     const u = db.prepare(`SELECT u.* FROM sessoes s JOIN utilizadores u ON u.id = s.utilizador_id
                           WHERE s.token_hash = ? AND s.expira > ?`).get(hash(token), agora());
-    if (u && !u.bloqueado) req.user = u;
+    if (u && u.estado !== "bloqueado") req.user = u;
   }
+  req.tes = eTes(req.user);
+  req.autor = req.user ? req.user.id : req.disp;
   next();
 }
-const precisa = nivel => (req, res, next) => {
-  const u = req.user;
-  if (!u) return res.status(401).json({ erro: "Precisas de entrar." });
-  if (nivel === "aprovado" && !eAprovado(u)) return res.status(403).json({ erro: "A tua conta ainda não foi aprovada." });
-  if (nivel === "tesoureiro" && !eTes(u)) return res.status(403).json({ erro: "Só os tesoureiros podem fazer isto." });
-  if (nivel === "admin" && !u.admin) return res.status(403).json({ erro: "Só o administrador pode fazer isto." });
+const soTesoureiro = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ erro: "Entra como tesoureiro." });
+  if (!req.tes) return res.status(403).json({ erro: "Só os tesoureiros aprovados podem fazer isto." });
   next();
 };
 
-/* entra (ou cria) o utilizador que o Google confirmou */
+/* entra (ou regista) um tesoureiro que o Google confirmou */
 function entrarUtilizador({ sub, email, nome, foto }) {
   email = email.toLowerCase();
   let u = (sub && db.prepare("SELECT * FROM utilizadores WHERE google_sub = ?").get(sub))
        || db.prepare("SELECT * FROM utilizadores WHERE email = ?").get(email);
-  const eAdmin = ADMIN_EMAILS.includes(email)
-    || (!ADMIN_EMAILS.length && db.prepare("SELECT COUNT(*) AS n FROM utilizadores").get().n === 0);
+  const automatico = TESOUREIROS_EMAILS.includes(email) || nAtivos() === 0;
   if (!u) {
     const id = novoId();
-    db.prepare(`INSERT INTO utilizadores (id, google_sub, email, nome, foto, tipo, admin, tesoureiro, criado_em)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, sub || null, email, txt(nome, 80) || email, foto || null, eAdmin ? "visitante" : "pendente", eAdmin ? 1 : 0, eAdmin ? 1 : 0, agora());
+    db.prepare(`INSERT INTO utilizadores (id, google_sub, email, nome, foto, estado, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, sub || null, email, txt(nome, 80) || email, foto || null, automatico ? "ativo" : "pendente", agora());
     u = utilPorId(id);
-    avisar(); // o admin vê logo o pedido novo
+    avisar(); // os outros tesoureiros veem logo o pedido
   } else {
     db.prepare("UPDATE utilizadores SET google_sub = COALESCE(google_sub, ?), foto = COALESCE(?, foto) WHERE id = ?").run(sub || null, foto || null, u.id);
-    if (eAdmin && (!u.admin || u.bloqueado)) db.prepare("UPDATE utilizadores SET admin = 1, tesoureiro = 1, bloqueado = 0, tipo = CASE WHEN tipo = 'pendente' THEN 'visitante' ELSE tipo END WHERE id = ?").run(u.id);
+    if (u.estado === "pendente" && automatico) {
+      db.prepare("UPDATE utilizadores SET estado = 'ativo' WHERE id = ?").run(u.id);
+      avisar();
+    }
     u = utilPorId(u.id);
   }
   return u;
@@ -166,6 +205,18 @@ function entrarUtilizador({ sub, email, nome, foto }) {
 const clientes = new Set();
 function avisar() { for (const c of clientes) c.write("data: mudou\n\n"); }
 setInterval(() => { for (const c of clientes) c.write(": ping\n\n"); }, 25000).unref();
+
+/* ---------- limite de pedidos para quem não tem conta ---------- */
+const limites = new Map();
+const limitar = (nome, max, janelaMs) => (req, res, next) => {
+  if (req.tes) return next();
+  const k = nome + ":" + req.ip, t = Date.now();
+  let e = limites.get(k);
+  if (!e || e.inicio + janelaMs < t) { e = { inicio: t, n: 0 }; limites.set(k, e); }
+  if (++e.n > max) return res.status(429).json({ erro: "Demasiados pedidos seguidos. Espera um bocado e tenta outra vez." });
+  next();
+};
+setInterval(() => { const t = Date.now(); for (const [k, e] of limites) if (e.inicio + 36e5 < t) limites.delete(k); }, 6e5).unref();
 
 /* ---------- validação ---------- */
 function fotosValidas(lista) {
@@ -178,8 +229,8 @@ function fotosValidas(lista) {
   }
   return out;
 }
-function novoMovimento(b, u) {
-  const tes = eTes(u);
+function novoMovimento(b, req) {
+  const tes = req.tes;
   const tipo = b.tipo;
   if (!["compra", "conta", "renda", "fundo"].includes(tipo)) falha(400, "Tipo de registo inválido.");
   if (!tes && tipo !== "compra") falha(403, "Só os tesoureiros podem registar isto.");
@@ -189,14 +240,14 @@ function novoMovimento(b, u) {
   if (tipo === "compra" || tipo === "conta") {
     m.pagoPor = b.pagoPor === "fundo" ? "fundo" : "bolso";
     m.reembolsado = false;
-    const quem = tes ? utilPorId(b.morador) : u;
+    const quem = pessoaPorId(b.morador);
     m.morador = quem ? quem.id : "";
     m.moradorNome = quem ? quem.nome : "";
     if (m.pagoPor === "bolso" && !m.morador) falha(400, "Diz quem pagou do bolso.");
     if (tipo === "conta") m.categoria = txt(b.categoria, 60) || "Outra";
   }
   if (tipo === "renda") {
-    const quem = utilPorId(b.morador);
+    const quem = pessoaPorId(b.morador);
     if (!quem) falha(400, "Escolhe a pessoa que pagou.");
     m.morador = quem.id; m.moradorNome = quem.nome;
   }
@@ -205,10 +256,28 @@ function novoMovimento(b, u) {
     if (!m.descricao) falha(400, "Escreve uma descrição.");
   }
   m.fotos = fotosValidas(b.fotos);
-  m.criadoPor = u.id;
+  m.criadoPor = req.autor;
   m.criadoEm = agora();
   m.anulado = false;
   return m;
+}
+function dadosPessoa(b, parcial) {
+  const out = {};
+  if (!parcial || "nome" in b) { out.nome = txt(b.nome, 80); if (!out.nome) falha(400, "Escreve o nome."); }
+  if (!parcial || "tipo" in b) { if (!TIPOS_PESSOA.includes(b.tipo)) falha(400, "Tipo inválido."); out.tipo = b.tipo; }
+  if (!parcial || "valorFixo" in b) {
+    const v = b.valorFixo ?? null;
+    if (v !== null && (!Number.isInteger(v) || v < 0 || v > 1e8)) falha(400, "Valor fixo inválido.");
+    out.valor_fixo = v;
+  }
+  for (const k of ["entrada", "saida"]) {
+    if (!parcial || k in b) {
+      const v = b[k] ?? null;
+      if (v !== null && !reMes.test(v)) falha(400, "Mês inválido.");
+      out[k] = v;
+    }
+  }
+  return out;
 }
 const CHAVES_CONFIG = {
   nome: "string", plafond: "int", fundoInicial: "int", rendasNoFundo: "bool", anoInicio: "intnull",
@@ -247,19 +316,22 @@ app.set("trust proxy", process.env.TRUST_PROXY || "loopback, linklocal, uniquelo
 app.use((_req, res, next) => {
   res.set({
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Referrer-Policy": "same-origin",
     "X-Frame-Options": "DENY",
+    "X-Robots-Tag": "noindex, nofollow",
     "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
   });
   next();
 });
 app.use(express.json({ limit: "2mb" }));
-app.use(autenticar);
+app.use(identificar);
 
 const loopback = req => {
   const ip = req.socket.remoteAddress || "";
   return !req.headers["x-forwarded-for"] && (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1");
 };
+
+app.get("/robots.txt", (_req, res) => res.type("text/plain").send("User-agent: *\nDisallow: /\n"));
 
 app.get("/api/publico", (req, res) => {
   const c = lerConfig();
@@ -267,7 +339,7 @@ app.get("/api/publico", (req, res) => {
 });
 
 const google = new OAuth2Client(GOOGLE_CLIENT_ID);
-app.post("/api/entrar/google", async (req, res) => {
+app.post("/api/entrar/google", limitar("entrar", 30, 36e5), async (req, res) => {
   if (!GOOGLE_CLIENT_ID) return res.status(500).json({ erro: "O servidor não tem GOOGLE_CLIENT_ID configurado." });
   const credential = req.body && req.body.credential;
   if (typeof credential !== "string") return res.status(400).json({ erro: "Falta a credencial do Google." });
@@ -280,9 +352,9 @@ app.post("/api/entrar/google", async (req, res) => {
   }
   if (!p || !p.email || !p.email_verified) return res.status(403).json({ erro: "A conta Google não tem um email confirmado." });
   const u = entrarUtilizador({ sub: p.sub, email: p.email, nome: p.name, foto: p.picture });
-  if (u.bloqueado) return res.status(403).json({ erro: "Esta conta não tem acesso. Fala com o administrador da casa." });
+  if (u.estado === "bloqueado") return res.status(403).json({ erro: "Esta conta não pode ser tesoureira. Fala com outro tesoureiro." });
   criarSessao(res, u.id);
-  res.json({ eu: utilPublico(u, true) });
+  res.json({ eu: tesPublico(u, true) });
 });
 
 // Só para testar no próprio computador (DEV_LOGIN=1): entra sem Google. Nunca ligar em produção.
@@ -291,33 +363,36 @@ app.post("/api/entrar/dev", (req, res) => {
   const email = txt(req.body && req.body.email, 120).toLowerCase();
   if (!/^[^@\s]+@[^@\s]+$/.test(email)) return res.status(400).json({ erro: "Email inválido." });
   const u = entrarUtilizador({ sub: null, email, nome: txt(req.body.nome, 80) || email.split("@")[0], foto: null });
-  if (u.bloqueado) return res.status(403).json({ erro: "Esta conta não tem acesso. Fala com o administrador da casa." });
+  if (u.estado === "bloqueado") return res.status(403).json({ erro: "Esta conta não pode ser tesoureira." });
   criarSessao(res, u.id);
-  res.json({ eu: utilPublico(u, true) });
+  res.json({ eu: tesPublico(u, true) });
 });
 
 app.post("/api/sair", (req, res) => {
   const token = lerCookie(req, COOKIE);
   if (token) db.prepare("DELETE FROM sessoes WHERE token_hash = ?").run(hash(token));
-  definirCookie(res, "", 0);
+  definirCookie(res, COOKIE, "", 0);
   res.json({ ok: true });
 });
 
-app.get("/api/eu", precisa("sessao"), (req, res) => {
-  res.json({ eu: utilPublico(req.user, true), aprovado: eAprovado(req.user) });
-});
-
-app.get("/api/estado", precisa("aprovado"), (req, res) => {
-  const admin = !!req.user.admin;
-  const users = db.prepare("SELECT * FROM utilizadores ORDER BY nome COLLATE NOCASE").all()
-    .filter(u => admin || u.tipo !== "pendente")
-    .map(u => utilPublico(u, admin));
+app.get("/api/estado", (req, res) => {
+  const tes = req.tes;
+  const tesoureiros = db.prepare("SELECT * FROM utilizadores ORDER BY nome COLLATE NOCASE").all()
+    .filter(u => tes || u.estado === "ativo")
+    .map(u => tesPublico(u, tes));
+  const pessoas = db.prepare("SELECT * FROM pessoas ORDER BY nome COLLATE NOCASE").all().map(pessoaPublica);
   const movimentos = db.prepare("SELECT id, dados FROM movimentos ORDER BY criado_em").all()
     .map(r => Object.assign(JSON.parse(r.dados), { id: r.id }));
-  res.json({ eu: utilPublico(req.user, true), config: lerConfig() || {}, utilizadores: users, movimentos });
+  res.json({
+    eu: req.user ? tesPublico(req.user, true) : null,
+    autor: req.autor,
+    config: lerConfig() || {},
+    pessoas, tesoureiros, movimentos,
+  });
 });
 
-app.get("/api/eventos", precisa("aprovado"), (req, res) => {
+app.get("/api/eventos", (req, res) => {
+  if (clientes.size > 500) return res.status(503).end();
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
@@ -329,22 +404,22 @@ app.get("/api/eventos", precisa("aprovado"), (req, res) => {
   req.on("close", () => clientes.delete(res));
 });
 
-app.post("/api/movimentos", precisa("aprovado"), (req, res) => {
-  const m = novoMovimento(req.body || {}, req.user);
+app.post("/api/movimentos", limitar("registar", 120, 36e5), (req, res) => {
+  const m = novoMovimento(req.body || {}, req);
   const id = novoId();
   db.prepare("INSERT INTO movimentos (id, mes, criado_em, dados) VALUES (?, ?, ?, ?)").run(id, m.mes, m.criadoEm, JSON.stringify(m));
   avisar();
   res.status(201).json(Object.assign(m, { id }));
 });
 
-app.patch("/api/movimentos/:id", precisa("aprovado"), (req, res) => {
+app.patch("/api/movimentos/:id", limitar("registar", 120, 36e5), (req, res) => {
   const row = db.prepare("SELECT dados FROM movimentos WHERE id = ?").get(req.params.id);
   if (!row) falha(404, "Registo não encontrado.");
-  const m = JSON.parse(row.dados), b = req.body || {}, u = req.user;
-  const tes = eTes(u), meuCompra = m.criadoPor === u.id && m.tipo === "compra";
+  const m = JSON.parse(row.dados), b = req.body || {};
+  const tes = req.tes, minhaCompra = m.criadoPor === req.autor && m.tipo === "compra";
   if (b.anulado === true) {
-    if (!tes && !meuCompra) falha(403, "Só podes anular as tuas compras.");
-    if (!m.anulado) Object.assign(m, { anulado: true, anuladoPor: u.id, anuladoEm: agora() });
+    if (!tes && !minhaCompra) falha(403, "Só podes anular as compras que registaste neste aparelho.");
+    if (!m.anulado) Object.assign(m, { anulado: true, anuladoPor: req.autor, anuladoEm: agora() });
   }
   if (b.reembolsado === true) {
     if (!tes) falha(403, "Só os tesoureiros podem pagar em dinheiro.");
@@ -352,7 +427,7 @@ app.patch("/api/movimentos/:id", precisa("aprovado"), (req, res) => {
     if (!m.reembolsado) Object.assign(m, { reembolsado: true, reembolsadoEm: agora() });
   }
   if (Array.isArray(b.fotosNovas)) {
-    if (!tes && !meuCompra) falha(403, "Só podes juntar talões às tuas compras.");
+    if (!tes && !minhaCompra) falha(403, "Só podes juntar talões às compras que registaste neste aparelho.");
     m.fotos = (m.fotos || []).concat(fotosValidas(b.fotosNovas)).slice(0, 8);
   }
   db.prepare("UPDATE movimentos SET dados = ? WHERE id = ?").run(JSON.stringify(m), req.params.id);
@@ -360,7 +435,7 @@ app.patch("/api/movimentos/:id", precisa("aprovado"), (req, res) => {
   res.json(Object.assign(m, { id: req.params.id }));
 });
 
-app.put("/api/config", precisa("tesoureiro"), (req, res) => {
+app.put("/api/config", soTesoureiro, (req, res) => {
   const c = Object.assign(lerConfig() || {}, mudancasConfig(req.body));
   if (JSON.stringify(c).length > 1_000_000) falha(413, "As definições ficaram grandes demais.");
   gravarConfig(c);
@@ -368,62 +443,69 @@ app.put("/api/config", precisa("tesoureiro"), (req, res) => {
   res.json(c);
 });
 
-app.patch("/api/utilizadores/:id", precisa("admin"), (req, res) => {
-  const u = utilPorId(req.params.id);
-  if (!u) falha(404, "Pessoa não encontrada.");
-  const b = req.body || {}, mud = {};
-  if ("nome" in b) { mud.nome = txt(b.nome, 80); if (!mud.nome) falha(400, "O nome não pode ficar vazio."); }
-  if ("tipo" in b) {
-    if (!TIPOS.includes(b.tipo)) falha(400, "Tipo inválido.");
-    if (u.admin && b.tipo === "pendente") falha(400, "O administrador não pode ficar pendente.");
-    mud.tipo = b.tipo;
-  }
-  if ("bloqueado" in b) {
-    if (u.admin && b.bloqueado) falha(400, "O administrador não pode ser bloqueado.");
-    mud.bloqueado = b.bloqueado ? 1 : 0;
-  }
-  if ("tesoureiro" in b) mud.tesoureiro = b.tesoureiro ? 1 : 0;
-  if ("valorFixo" in b) {
-    if (b.valorFixo !== null && (!Number.isInteger(b.valorFixo) || b.valorFixo < 0 || b.valorFixo > 1e8)) falha(400, "Valor fixo inválido.");
-    mud.valor_fixo = b.valorFixo;
-  }
-  for (const k of ["entrada", "saida"]) {
-    if (k in b) {
-      if (b[k] !== null && !reMes.test(b[k])) falha(400, "Mês inválido.");
-      mud[k] = b[k];
-    }
-  }
-  const cols = Object.keys(mud);
+/* pessoas da casa (moradores, comensais, meios comensais): só os tesoureiros mexem */
+app.post("/api/pessoas", soTesoureiro, (req, res) => {
+  const d = dadosPessoa(req.body || {}, false), id = novoId();
+  db.prepare("INSERT INTO pessoas (id, nome, tipo, valor_fixo, entrada, saida, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(id, d.nome, d.tipo, d.valor_fixo, d.entrada, d.saida, agora());
+  avisar();
+  res.status(201).json(pessoaPublica(pessoaPorId(id)));
+});
+app.patch("/api/pessoas/:id", soTesoureiro, (req, res) => {
+  const p = pessoaPorId(req.params.id);
+  if (!p) falha(404, "Pessoa não encontrada.");
+  const d = dadosPessoa(req.body || {}, true), cols = Object.keys(d);
   if (cols.length) {
-    db.prepare(`UPDATE utilizadores SET ${cols.map(c => `${c} = ?`).join(", ")} WHERE id = ?`).run(...cols.map(c => mud[c]), u.id);
-    if (mud.bloqueado) db.prepare("DELETE FROM sessoes WHERE utilizador_id = ?").run(u.id);
+    db.prepare(`UPDATE pessoas SET ${cols.map(c => `${c} = ?`).join(", ")} WHERE id = ?`).run(...cols.map(c => d[c]), p.id);
     avisar();
   }
-  res.json(utilPublico(utilPorId(u.id), true));
+  res.json(pessoaPublica(pessoaPorId(p.id)));
+});
+app.delete("/api/pessoas/:id", soTesoureiro, (req, res) => {
+  const p = pessoaPorId(req.params.id);
+  if (!p) falha(404, "Pessoa não encontrada.");
+  const usada = db.prepare("SELECT 1 FROM movimentos WHERE json_extract(dados, '$.morador') = ? LIMIT 1").get(p.id);
+  if (usada) falha(400, "Esta pessoa já tem registos. Em vez de a apagar, marca o mês em que saiu.");
+  db.prepare("DELETE FROM pessoas WHERE id = ?").run(p.id);
+  avisar();
+  res.json({ ok: true });
 });
 
-app.delete("/api/utilizadores/:id", precisa("admin"), (req, res) => {
+/* tesoureiros: um tesoureiro ativo aprova, bloqueia ou recusa os outros */
+app.patch("/api/tesoureiros/:id", soTesoureiro, (req, res) => {
   const u = utilPorId(req.params.id);
-  if (!u) falha(404, "Pessoa não encontrada.");
-  if (u.tipo !== "pendente") falha(400, "Só se podem apagar pedidos pendentes. Para tirar o acesso a alguém, bloqueia a conta.");
+  if (!u) falha(404, "Tesoureiro não encontrado.");
+  const estado = req.body && req.body.estado;
+  if (!["ativo", "bloqueado"].includes(estado)) falha(400, "Estado inválido.");
+  if (estado === "bloqueado" && u.estado === "ativo" && nAtivos() <= 1) falha(400, "Tem de ficar pelo menos um tesoureiro.");
+  db.prepare("UPDATE utilizadores SET estado = ?, aprovado_por = CASE WHEN ? = 'ativo' THEN ? ELSE aprovado_por END WHERE id = ?")
+    .run(estado, estado, req.user.id, u.id);
+  if (estado === "bloqueado") db.prepare("DELETE FROM sessoes WHERE utilizador_id = ?").run(u.id);
+  avisar();
+  res.json(tesPublico(utilPorId(u.id), true));
+});
+app.delete("/api/tesoureiros/:id", soTesoureiro, (req, res) => {
+  const u = utilPorId(req.params.id);
+  if (!u) falha(404, "Tesoureiro não encontrado.");
+  if (u.estado !== "pendente") falha(400, "Só se podem recusar pedidos pendentes.");
   db.prepare("DELETE FROM utilizadores WHERE id = ?").run(u.id);
   avisar();
   res.json({ ok: true });
 });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024, files: 1 } });
-app.post("/api/fotos", precisa("aprovado"), upload.single("foto"), (req, res) => {
+app.post("/api/fotos", limitar("fotos", 60, 36e5), upload.single("foto"), (req, res) => {
   if (!req.file) falha(400, "Falta o ficheiro.");
   const t = tipoFicheiro(req.file.buffer);
   if (!t) falha(415, "Esse ficheiro não dá. Usa uma foto (JPG, PNG, WEBP) ou um PDF.");
   const id = crypto.randomBytes(16).toString("hex");
   const ficheiro = `${id}.${t[1]}`;
   fs.writeFileSync(path.join(DATA_DIR, "fotos", ficheiro), req.file.buffer);
-  db.prepare("INSERT INTO fotos (id, mime, ficheiro, criado_por, criado_em) VALUES (?, ?, ?, ?, ?)").run(id, t[0], ficheiro, req.user.id, agora());
+  db.prepare("INSERT INTO fotos (id, mime, ficheiro, criado_por, criado_em) VALUES (?, ?, ?, ?, ?)").run(id, t[0], ficheiro, req.autor, agora());
   res.status(201).json({ id, pdf: t[0] === "application/pdf" });
 });
 
-app.get("/api/fotos/:id", precisa("aprovado"), (req, res) => {
+app.get("/api/fotos/:id", (req, res) => {
   const r = db.prepare("SELECT mime, ficheiro FROM fotos WHERE id = ?").get(req.params.id);
   if (!r) return res.status(404).end();
   res.set({ "Content-Type": r.mime, "Cache-Control": "private, max-age=31536000, immutable", "Content-Disposition": "inline" });
@@ -431,7 +513,7 @@ app.get("/api/fotos/:id", precisa("aprovado"), (req, res) => {
 });
 
 // Cópia de segurança da base de dados (não inclui as fotos; essas estão em DATA_DIR/fotos).
-app.get("/api/copia-seguranca", precisa("admin"), (_req, res) => {
+app.get("/api/copia-seguranca", soTesoureiro, (_req, res) => {
   const tmp = path.join(DATA_DIR, `copia-${Date.now()}.db`);
   db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
   res.download(tmp, `caixa-da-casa-${agora().slice(0, 10)}.db`, () => fs.rm(tmp, { force: true }, () => {}));
@@ -455,7 +537,7 @@ setInterval(() => db.prepare("DELETE FROM sessoes WHERE expira < ?").run(agora()
 
 const servidor = app.listen(PORT, () => {
   console.log(`Caixa da Casa a correr na porta ${PORT} (dados em ${DATA_DIR})`);
-  if (!GOOGLE_CLIENT_ID) console.warn("Aviso: GOOGLE_CLIENT_ID não está definido; o login com Google não vai funcionar.");
+  if (!GOOGLE_CLIENT_ID) console.warn("Aviso: GOOGLE_CLIENT_ID não está definido; os tesoureiros não vão conseguir entrar com Google.");
   if (DEV_LOGIN) console.warn("Aviso: DEV_LOGIN=1 — login de teste ligado (só funciona a partir deste computador).");
 });
 for (const s of ["SIGINT", "SIGTERM"]) process.on(s, () => { servidor.close(); db.close(); process.exit(0); });

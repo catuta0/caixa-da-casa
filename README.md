@@ -9,7 +9,7 @@ Livro de caixa para casas comunitárias e associações. Toda a gente vê as con
 - **Fotos dos talões** em cada compra ou conta.
 - **Fundo de maneio**: livro de caixa com entradas, saídas e saldo, mês a mês.
 - **Histórico** de todos os meses e exportação para Excel (CSV).
-- **Login com conta Google**; o administrador aprova quem entra e escolhe os tesoureiros.
+- **Sem contas para o dia a dia**: quem tem o link vê tudo e regista compras. Só os **tesoureiros** entram (com a conta Google), e um tesoureiro novo tem de ser aprovado por outro.
 - Funciona bem no telemóvel.
 
 ## Instalação rápida
@@ -20,7 +20,7 @@ Com o Docker instalado, o domínio a apontar para o servidor e o ID do Google cr
 curl -fsSL https://raw.githubusercontent.com/catuta0/caixa-da-casa/main/instalar.sh | sh
 ```
 
-O script faz 4 perguntas (domínio, ID do Google, o teu email e o nome da casa), descarrega a imagem já pronta e arranca a app com HTTPS.
+O script faz 4 perguntas (domínio, ID do Google, o teu email de tesoureiro e o nome da casa), descarrega a imagem já pronta e arranca a app com HTTPS.
 
 A imagem está em `ghcr.io/catuta0/caixa-da-casa` e funciona em servidores Intel/AMD e ARM (Raspberry Pi 4/5, servidores Ampere).
 
@@ -44,17 +44,25 @@ A imagem está em `ghcr.io/catuta0/caixa-da-casa` e funciona em servidores Intel
 
 ## Quem pode fazer o quê
 
-| Papel | O que pode fazer |
+| Quem | O que pode fazer |
 |---|---|
-| **À espera** | Entrou com o Google mas ainda não foi aprovado. Não vê nada. |
-| **Visitante** | Vê tudo e regista compras. Não entra na divisão da renda. |
-| **Morador** | Vê tudo e regista compras. Paga a sua parte de todas as despesas. |
-| **Comensal** | Como o morador, mas só paga a sua parte das despesas escolhidas (por defeito: comida, internet e gás), ou um valor fixo. |
-| **Meio comensal** | Paga metade do que paga um comensal. |
-| **Tesoureiro** | Além do seu tipo, regista contas, pagamentos de renda e movimentos do fundo, e mexe nas definições e na calculadora da renda. |
-| **Administrador** | Tudo o que o tesoureiro faz, e ainda aprova pessoas, muda o tipo, dá ou tira a permissão de tesoureiro e bloqueia contas. |
+| **Qualquer pessoa com o link** (sem conta) | Vê tudo: plafond, rendas, contas, fundo e histórico. Regista compras, com foto do talão. Pode anular ou juntar talões às compras que registou **no mesmo telemóvel/computador**. |
+| **Tesoureiro** (entra com Google) | Tudo o resto: regista contas, pagamentos de renda e movimentos do fundo; gere as pessoas da casa (moradores, comensais, meios comensais); mexe nas definições e na calculadora da renda; anula qualquer registo; aprova ou retira outros tesoureiros. |
+| **Tesoureiro à espera** | Entrou com o Google mas ainda não foi aprovado. Vê e regista compras como toda a gente até outro tesoureiro o aprovar. |
 
-Cada membro pode anular ou juntar talões às **suas** compras. Estas regras são verificadas no servidor, não só no ecrã.
+**Como se aprovam os tesoureiros:** quem entra primeiro fica logo tesoureiro (ou quem estiver em `TESOUREIRO_EMAIL`). A partir daí, cada tesoureiro novo fica à espera até um tesoureiro aprovado o aceitar em **Definições → Tesoureiros**. Se um dia deixar de haver tesoureiros aprovados, o próximo a entrar fica logo tesoureiro. Tem sempre de ficar pelo menos um.
+
+**As pessoas da casa** não precisam de conta. O tesoureiro regista-as em **Definições → Pessoas da casa**:
+
+| Tipo | Quanto paga |
+|---|---|
+| **Morador** | A sua parte de todas as despesas. |
+| **Comensal** | Só a sua parte das despesas escolhidas na calculadora (por defeito: comida, internet e gás), ou um valor fixo. |
+| **Meio comensal** | Metade do que paga um comensal. |
+
+Em cada telemóvel, a pessoa escolhe uma vez **«Quem és tu?»** e passa a ver logo a sua renda; nas compras, «Quem comprou» já vem com o nome dela.
+
+**Atenção:** como não há login para ver, **o link é a chave**. Quem o tiver vê os nomes e os valores da casa. Partilha-o só com a casa (o site está marcado para não aparecer no Google). Estas regras são verificadas no servidor, não só no ecrã.
 
 ## O que precisas
 
@@ -135,7 +143,7 @@ O script:
 
 1. confirma que o Docker está instalado;
 2. cria a pasta `caixa-da-casa` e descarrega o `docker-compose.yml` e o `Caddyfile`;
-3. pergunta o domínio, o ID de cliente do Google, o teu email (administrador) e o nome da casa, e guarda tudo no `.env`;
+3. pergunta o domínio, o ID de cliente do Google, o teu email (para ficares logo tesoureiro) e o nome da casa, e guarda tudo no `.env`;
 4. descarrega a imagem e arranca a app e o Caddy (HTTPS).
 
 Preferes ver o script antes de o correr? Descarrega-o, lê-o e só depois corre-o:
@@ -161,13 +169,13 @@ Preenche o `.env`:
 ```bash
 DOMINIO=caixa.minhacasa.pt
 GOOGLE_CLIENT_ID=123456789-abc123.apps.googleusercontent.com
-ADMIN_EMAIL=o-teu-email@gmail.com
+TESOUREIRO_EMAIL=o-teu-email@gmail.com
 NOME_CASA=Casa comunitária
 ```
 
 - `DOMINIO`: o domínio do passo 2, sem `https://`.
 - `GOOGLE_CLIENT_ID`: o ID do passo 3.
-- `ADMIN_EMAIL`: o email da conta Google de quem vai administrar. Para ter mais do que um administrador, separa por vírgulas.
+- `TESOUREIRO_EMAIL` (opcional): o email da conta Google de quem vai ser tesoureiro desde o início, sem precisar de aprovação. Vários? Separa por vírgulas. Se ficar vazio, quem entrar primeiro fica tesoureiro.
 
 Grava com `Ctrl+O`, `Enter`, e sai com `Ctrl+X`. Depois arranca:
 
@@ -182,21 +190,21 @@ docker compose ps          # os dois serviços devem estar "running" (a app fica
 docker compose logs -f     # Ctrl+C para sair
 ```
 
-Abre `https://caixa.minhacasa.pt` e entra com a conta Google do `ADMIN_EMAIL`. Ficas **administrador** e **tesoureiro**. A app arranca sozinha se o servidor reiniciar.
+Abre `https://caixa.minhacasa.pt`, carrega em **Entrar como tesoureiro** e entra com a tua conta Google. Ficas **tesoureiro**. A app arranca sozinha se o servidor reiniciar.
 
 **Já tens outro proxy** (Nginx, Traefik, Nginx Proxy Manager…) a ocupar as portas 80/443? Abre o `docker-compose.yml`, apaga o serviço `caddy` (e os volumes `caddy-dados` e `caddy-config`), descomenta as duas linhas `ports` do serviço `caixa` e aponta o teu proxy para `http://127.0.0.1:3000`. O proxy tem de fazer HTTPS e não pode guardar em buffer o endereço `/api/eventos` (atualizações em tempo real).
 
 ## Passo 5: primeiros passos dentro da app
 
+Como tesoureiro:
+
 1. **Definições → A casa e o dinheiro**: nome da casa, plafond mensal de compras e o dinheiro que há agora no fundo de maneio (saldo inicial).
-2. **Manda o endereço da app** às pessoas da casa. Cada uma entra com o Google e fica **à espera**.
-3. **Definições → Membros**: aprova cada pessoa e escolhe o tipo (morador, comensal, meio comensal ou visitante) e o mês em que entrou. Se um comensal paga um valor fixo, põe-no aqui. Marca **Tesoureiro** em quem vai gerir o dinheiro.
-4. Se tu próprio vives na casa, edita-te e muda o teu tipo para **Morador**, para entrares na divisão da renda.
-5. **Rendas → Calcular a renda do mês**: põe a previsão de cada despesa, marca o que os comensais pagam e carrega em **Usar como renda do mês**.
+2. **Definições → Pessoas da casa**: adiciona cada pessoa com o tipo (morador, comensal ou meio comensal) e o mês em que entrou. Se um comensal paga um valor fixo, põe-no aqui. Se tu vives na casa, adiciona-te também.
+3. **Rendas → Calcular a renda do mês**: põe a previsão de cada despesa, marca o que os comensais pagam e carrega em **Usar como renda do mês**.
+4. **Manda o link da app** às pessoas da casa. Cada uma escolhe **«Quem és tu?»** e já vê a sua renda. Para registar compras é só carregar em **+ Registar compra**.
+5. **Outros tesoureiros?** Pede-lhes para abrirem a app e carregarem em **Entrar como tesoureiro**. Depois aprova-os em **Definições → Tesoureiros**.
 
-A partir daí, cada pessoa só precisa de abrir a app e carregar em **+ Registar compra**.
-
-**Alguém saiu da casa?** Edita a pessoa e põe o mês em **«Saiu no fim de»**. Não mudes o tipo dela, para as contas dos meses passados não mudarem. Para lhe tirar o acesso à app, marca **«Sem acesso»**.
+**Alguém saiu da casa?** Em **Pessoas da casa**, edita a pessoa e põe o mês em **«Saiu no fim de»**. Não a apagues nem mudes o tipo, para as contas dos meses passados não mudarem.
 
 ## Como funcionam as contas
 
@@ -212,7 +220,7 @@ A partir daí, cada pessoa só precisa de abrir a app e carregar em **+ Registar
 
 Todos os dados ficam no volume Docker `caixa-dados`: a base de dados (`caixa.db`) e as fotos dos talões (`fotos/`).
 
-**Rápido:** em **Definições**, o administrador tem o botão **Descarregar cópia de segurança** (base de dados, sem as fotos).
+**Rápido:** em **Definições → Tesoureiros**, os tesoureiros têm o botão **Descarregar cópia de segurança** (base de dados, sem as fotos).
 
 **Completo** (base de dados + fotos), dentro da pasta da app:
 
@@ -261,11 +269,14 @@ O Caddy não conseguiu criar o certificado. Confirma que o domínio aponta para 
 **Entro com o Google mas volto sempre ao ecrã de entrada.**
 Estás a abrir a app sem HTTPS (os cookies de sessão só funcionam por HTTPS). Usa `https://`.
 
-**Entrei, mas diz que estou à espera de aprovação e sou eu o administrador.**
-O email no `ADMIN_EMAIL` não é o da conta com que entraste. Corrige o `.env`, corre `docker compose up -d` e entra outra vez.
+**Entrei como tesoureiro, mas diz que estou à espera de aprovação.**
+Outro tesoureiro tem de te aprovar em **Definições → Tesoureiros**. Se és tu quem instalou e ainda não há outro tesoureiro, alguém entrou antes de ti: põe o teu email em `TESOUREIRO_EMAIL` no `.env`, corre `docker compose up -d` e entra outra vez.
 
-**Uma pessoa diz que não consegue entrar.**
-Vê em **Definições → Membros** se está à espera (aprova-a) ou marcada como **Sem acesso**.
+**Perdemos o acesso de todos os tesoureiros.**
+Põe o email de quem vai ser tesoureiro em `TESOUREIRO_EMAIL` no `.env` e corre `docker compose up -d`; ao entrar, essa conta é aprovada logo (se não tiver sido retirada antes).
+
+**Uma pessoa não consegue anular uma compra que registou.**
+Só dá no mesmo telemóvel/computador onde a registou (e se não apagou os dados do navegador). Um tesoureiro consegue sempre anular.
 
 **As alterações dos outros só aparecem quando recarrego.**
 Se usas o teu próprio proxy, desliga o buffering para `/api/eventos` (no Nginx: `proxy_buffering off;`).
@@ -285,7 +296,7 @@ docker run -d --name caixa-da-casa --restart unless-stopped \
   -p 127.0.0.1:3000:3000 \
   -v caixa-dados:/app/dados \
   -e GOOGLE_CLIENT_ID=123456789-abc123.apps.googleusercontent.com \
-  -e ADMIN_EMAIL=o-teu-email@gmail.com \
+  -e TESOUREIRO_EMAIL=o-teu-email@gmail.com \
   ghcr.io/catuta0/caixa-da-casa:latest
 ```
 
@@ -306,10 +317,10 @@ Precisas de [Node.js](https://nodejs.org/) 22.13 ou mais recente (sem Docker):
 git clone https://github.com/catuta0/caixa-da-casa.git
 cd caixa-da-casa
 npm install
-DEV_LOGIN=1 ADMIN_EMAIL=teste@exemplo.pt npm start
+DEV_LOGIN=1 npm start
 ```
 
-Abre <http://localhost:3000>. Com `DEV_LOGIN=1` aparece um **login de teste** (só email e nome, sem Google) que só funciona a partir do próprio computador. Entra primeiro com o email do `ADMIN_EMAIL`, e depois com outros emails para veres como fica para um membro. **Nunca ligues o `DEV_LOGIN` no servidor.**
+Abre <http://localhost:3000>. Com `DEV_LOGIN=1`, em **Entrar como tesoureiro** aparece um **login de teste** (só email e nome, sem Google) que só funciona a partir do próprio computador. O primeiro email com que entrares fica tesoureiro; entra depois com outro (noutra janela privada) para veres a aprovação. **Nunca ligues o `DEV_LOGIN` no servidor.**
 
 Os dados de teste ficam na pasta `dados/`; apaga-a para recomeçar.
 
@@ -320,7 +331,7 @@ Para testares o login do Google em localhost, junta `http://localhost:3000` às 
 | Variável | Para quê |
 |---|---|
 | `GOOGLE_CLIENT_ID` | ID de cliente OAuth do Google. Obrigatório para entrar com Google. |
-| `ADMIN_EMAIL` | Email(s) Google do administrador, separados por vírgulas. Se ficar vazio, a primeira pessoa a entrar fica administradora. |
+| `TESOUREIRO_EMAIL` | Opcional. Email(s) Google aprovados logo como tesoureiros, separados por vírgulas. Se ficar vazio, quem entrar primeiro fica tesoureiro. (`ADMIN_EMAIL` também funciona, é o nome antigo.) |
 | `DOMINIO` | Domínio usado pelo Caddy para o HTTPS. |
 | `NOME_CASA` | Nome no ecrã de entrada até ser mudado em Definições. |
 | `PORT` | Porta interna (por defeito `3000`). |
@@ -343,7 +354,8 @@ caixa-da-casa/
 └── .github/workflows/   constrói e publica a imagem Docker
 ```
 
-- Login com **Google Identity Services**; o token é verificado no servidor e a sessão fica num cookie `HttpOnly`.
+- Sem login para ver e registar compras; cada aparelho tem um cookie anónimo para poder anular as suas compras. Pedidos de quem não tem conta têm um limite por hora.
+- Tesoureiros entram com **Google Identity Services**; o token é verificado no servidor e a sessão fica num cookie `HttpOnly`.
 - Dados em **SQLite** (um ficheiro), fotos em disco. Não há serviços externos além do login do Google e das fontes do Google Fonts.
 - Atualizações em tempo real com **Server-Sent Events**.
 - Fotos reduzidas no telemóvel antes de serem enviadas; o servidor só aceita JPG, PNG, WEBP, GIF e PDF (confirmados pelo conteúdo do ficheiro).

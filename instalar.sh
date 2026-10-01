@@ -36,15 +36,15 @@ if [ ! -f .env ]; then
   read -r DOMINIO </dev/tty
   printf "ID de cliente do Google (termina em .apps.googleusercontent.com): "
   read -r GOOGLE_CLIENT_ID </dev/tty
-  printf "O teu email Google (vais ser o administrador): "
-  read -r ADMIN_EMAIL </dev/tty
+  printf "O teu email Google (ficas logo tesoureiro; podes deixar vazio): "
+  read -r TESOUREIRO_EMAIL </dev/tty
   printf "Nome da casa [Casa comunitária]: "
   read -r NOME_CASA </dev/tty
   DOMINIO=$(printf "%s" "$DOMINIO" | sed -e 's#^https*://##' -e 's#/*$##')
   cat > .env <<EOF
 DOMINIO=$DOMINIO
 GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
-ADMIN_EMAIL=$ADMIN_EMAIL
+TESOUREIRO_EMAIL=$TESOUREIRO_EMAIL
 NOME_CASA=${NOME_CASA:-Casa comunitária}
 EOF
   chmod 600 .env
@@ -60,5 +60,6 @@ docker compose up -d
 
 DOMINIO=$(grep '^DOMINIO=' .env | cut -d= -f2-)
 echo
-echo "Pronto! Daqui a um minuto abre https://$DOMINIO e entra com a conta Google de administrador."
+echo "Pronto! Daqui a um minuto abre https://$DOMINIO, carrega em «Entrar como tesoureiro» e entra com a tua conta Google."
+echo "Depois manda esse link às pessoas da casa: para ver e registar compras não precisam de conta."
 echo "Para ver o que se passa: cd $(pwd) && docker compose logs -f"

@@ -323,9 +323,10 @@ function h(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<
 function parseValor(s){s=String(s||"").trim().replace(/[€\s]/g,"");if(!s)return null;if(s.includes(","))s=s.replace(/\./g,"").replace(",",".");const n=Number(s);if(!isFinite(n)||n<=0)return null;return Math.round(n*100)}
 const sum=a=>a.reduce((t,x)=>t+(x.cent||0),0);
 
-const S={me:null,users:[],canWrite:true,loading:true,saving:false,
+const S={me:null,autor:null,pub:null,vista:null,tesoureiros:[],editMorador:null,canWrite:true,loading:true,saving:false,
   config:Object.assign({},DEF),moradores:[],movs:{},mes:hojeMes(),tab:"resumo",
   confirm:null,rendaEdit:null,ajusteEdit:null,eu:null,tes:false,detAberto:false,filtro:"tudo",verTodos:false,fotos:{c:[],k:[]},anexoAlvo:null,verFoto:null,resumoForm:null,editMembro:null,names:{},fresh:true,reset:null};
+try{S.eu=localStorage.getItem("caixa-eu")||null}catch(e){}
 const app=document.getElementById("app");
 
 /* ---------- derived data ---------- */
@@ -370,17 +371,8 @@ function regraAtual(){
   S.moradores.forEach(r=>{if(eComensal(r)){comensais.push(r.id);if(eMeio(r))meios.push(r.id);if(r.valorFixo!=null)fixos[r.id]=r.valorFixo}});
   return {linhas:(S.config.comensalLinhas||LINHAS_COM_DEF).slice(),fixos,comensais,meios,pessoas:S.moradores.map(r=>r.id)};
 }
-/* uma pessoa pelo id, mesmo que hoje já não seja morador/comensal (para meses antigos) */
-function pessoaInfo(id){
-  const r=S.moradores.find(x=>x.id===id);if(r)return r;
-  const u=S.users.find(x=>x.id===id);return u?{id:u.id,nome:u.nome,tipo:u.tipo,valorFixo:u.valorFixo,entrada:u.entrada,saida:u.saida}:null;
-}
-/* quem conta para a renda de um mês: os de agora e os que estavam na regra guardada desse mês */
-function pessoasCasa(m){
-  const ids=new Set(S.moradores.map(r=>r.id));
-  const extra=(regraDe(m).pessoas||[]).filter(id=>!ids.has(id)).map(pessoaInfo).filter(Boolean);
-  return S.moradores.concat(extra);
-}
+const pessoaInfo=id=>S.moradores.find(x=>x.id===id)||null;
+const pessoasCasa=m=>S.moradores;
 /* acertos manuais do tesoureiro: valor da parte de uma pessoa num mês */
 const ajustesDe=m=>(S.config.ajustesMes||{})[m]||{};
 function regraDe(m){
@@ -398,7 +390,7 @@ function dividirPeso(t,gs,out){
 function divisao(t,v,m,regra){
   regra=regra||regraDe(m);
   const aj=regra.ajustes||{},meios=regra.meios||[];
-  const base=regra.pessoas?regra.pessoas.map(pessoaInfo).filter(Boolean):S.moradores;
+  const base=S.moradores;
   const todos=base.filter(r=>ativoEm(r,m)).sort((a,b)=>a.nome.localeCompare(b.nome,"pt")||a.id.localeCompare(b.id));
   const isCom=r=>regra.comensais.includes(r.id),isMeio=r=>meios.includes(r.id),peso=r=>isMeio(r)?.5:1;
   const mor=todos.filter(r=>!isCom(r)),com=todos.filter(isCom);
@@ -482,7 +474,7 @@ function rendaDe(r,m,vis){
   else estado=m<hojeMes()?["bad","Em falta"]:["neutral","Por pagar"];
   return {parte,antes,desconto,devido,pago,falta,aFavor,estado};
 }
-const nomeMorador=id=>{const u=S.users.find(x=>x.id===id);return u?u.nome:""};
+const nomeMorador=id=>{const r=S.moradores.find(x=>x.id===id);return r?r.nome:""};
 function porReembolsar(){
   const lim=addMes(hojeMes(),-1);
   const pend=vivos().filter(x=>eBolso(x)&&!x.reembolsado&&x.mes>=lim);
@@ -503,6 +495,7 @@ function render(){
   for(const id in vals){const el=document.getElementById(id);if(!el)continue;if(el.type==="checkbox")el.checked=vals[id];else if(el.tagName!=="SELECT"||[...el.options].some(o=>o.value===vals[id]))el.value=vals[id]}
   if(actId){const el=document.getElementById(actId);if(el){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(e){}}}
   rotularTabelas();
+  if(S.vista==="entrar")montarGoogle();
   atualizarPrev();
   pedirNomes();
 }
@@ -514,10 +507,12 @@ function rotularTabelas(){
 }
 
 function page(){
+  if(S.vista==="entrar")return vistaEntrar();
   const c=S.config,atual=S.mes===hojeMes();
   let out=`<header class="top">
-    <div class="brand"><div class="eyebrow">Livro de caixa da casa · <span class="chip ${S.tes?"good":"neutral"}" style="text-transform:none;letter-spacing:0">${S.me.admin?"administrador":S.tes?"tesoureiro":"membro"}</span></div><h1>${h(c.nome||DEF.nome)}</h1>
-      <div class="quem">${S.me.foto?`<img class="avatar sm" src="${h(S.me.foto)}" alt="" referrerpolicy="no-referrer">`:""}<span>${h(S.me.nome)}</span><button class="linkbtn" data-act="sair">Sair</button></div></div>
+    <div class="brand"><div class="eyebrow">Livro de caixa da casa</div><h1>${h(c.nome||DEF.nome)}</h1>
+      ${S.me?`<div class="quem">${avatar(S.me,"sm")}<span>${h(S.me.nome)}</span><span class="chip ${S.tes?"good":"warn"}">${S.tes?"tesoureiro":"à espera de aprovação"}</span><button class="linkbtn" data-act="sair">Sair</button></div>`
+        :'<div class="quem"><button class="linkbtn" data-act="entrar">Entrar como tesoureiro</button></div>'}</div>
     <div class="monthnav">
       <button class="iconbtn" data-act="mes" data-n="-1" aria-label="Mês anterior">‹</button>
       <div class="mlabel">${nomeMes(S.mes)}</div>
@@ -525,6 +520,7 @@ function page(){
       ${atual?"":'<button class="linkbtn" data-act="hoje">Ir para este mês</button>'}
     </div></header>
   <nav class="tabs" role="tablist">${TABS.map(([k,l,c],i)=>`${i===2?'<span class="tab-sep" aria-hidden="true"></span>':""}<button class="tab${i>=2?" sec":""}" role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}"><span class="l-long">${l}</span><span class="l-short">${c}</span></button>`).join("")}</nav>`;
+  if(S.me&&!S.tes)out+=`<div class="banner warn">Pediste para ser tesoureiro. Quando outro tesoureiro te aprovar, ficas a poder gerir tudo. Entretanto podes ver as contas e registar compras como toda a gente.</div>`;
   if(S.tab!=="resumo")out+=`<button class="linkbtn voltar" data-act="tab" data-t="resumo">← Voltar ao resumo</button>`;
   const fn={resumo:tResumo,rendas:tRendas,fundo:tFundo,historico:tHistorico,definicoes:tDefinicoes}[S.tab];
   return out+`<main class="stack">${fn()}</main>`+(S.verFoto?`<div class="lightbox" data-act="foto-fechar" role="dialog" aria-label="Talão"><img src="${h(S.verFoto)}" alt="Foto do talão"><button class="btn" data-act="foto-fechar">Fechar</button></div>`:"");
@@ -587,11 +583,6 @@ function optsMoradores(m,incluirVazio){
   let o=incluirVazio?'<option value="">—</option>':"";
   return o+rs.map(r=>`<option value="${h(r.id)}"${r.id===S.eu?" selected":""}>${h(r.nome)}</option>`).join("");
 }
-/* quem comprou/pagou: toda a gente com acesso, começando por quem está a registar */
-function optsQuem(m){
-  const pes=S.users.filter(u=>!u.bloqueado&&u.tipo!=="pendente").sort((a,b)=>a.nome.localeCompare(b.nome,"pt"));
-  return '<option value="">—</option>'+pes.map(u=>`<option value="${h(u.id)}"${u.id===S.me.id?" selected":""}>${h(u.nome)}</option>`).join("");
-}
 function dataDefault(){return S.mes===hojeMes()?hoje():S.mes+"-01"}
 function optsMeses(sel){let o="";for(let i=-6;i<=2;i++){const m=addMes(sel,i);o+=`<option value="${m}"${i===0?" selected":""}>${nomeMes(m)}</option>`}return o}
 const btnGuardar=l=>`<button class="btn primary" type="submit"${S.saving?" disabled":""}>${l}</button>`;
@@ -621,7 +612,7 @@ function tResumo(){
 
   let setup="";
   if(gere()){
-    const passos=[[S.config._existe,"Definir o plafond mensal e o saldo atual do fundo de maneio","definicoes"],[S.moradores.length>0,S.me.admin?"Aprovar as pessoas da casa (moradores e comensais) em Definições":"O administrador aprovar as pessoas da casa","definicoes"],[rendaTotal(hojeMes())!=null,"Pôr o valor total da renda da casa deste mês","rendas"]];
+    const passos=[[S.config._existe,"Definir o plafond mensal e o saldo atual do fundo de maneio","definicoes"],[S.moradores.length>0,"Adicionar as pessoas da casa (moradores e comensais)","definicoes"],[rendaTotal(hojeMes())!=null,"Pôr o valor total da renda da casa deste mês","rendas"]];
     if(passos.some(p=>!p[0]))setup=`<div class="card"><h2>Para começar</h2><ul class="checklist">${passos.map(p=>`<li><span class="dot${p[0]?" done":""}">${p[0]?"✓":""}</span><span>${p[1]}</span>${p[0]?"":`<button class="linkbtn" data-act="tab" data-t="${p[2]}">Fazer agora</button>`}</li>`).join("")}</ul></div>`;
   }
 
@@ -647,10 +638,13 @@ function tResumo(){
   return cardEu(m,vis)+setup+hero+formAberto+registos+numeros;
 }
 
-/* "a minha renda": a pessoa que entrou, se fizer parte da casa neste mês */
+/* "a minha renda": cada aparelho escolhe uma vez quem é (fica guardado neste aparelho) */
 function cardEu(m,vis){
-  const r=pessoasCasa(m).find(x=>x.id===S.me.id);
-  if(!r)return "";
+  const pessoas=S.moradores.filter(r=>ativoEm(r,m)).sort((a,b)=>a.nome.localeCompare(b.nome,"pt"));
+  if(!pessoas.length)return "";
+  const r=S.eu&&S.moradores.find(x=>x.id===S.eu);
+  if(!r)return `<div class="card eu-pick"><div><h3>Quem és tu?</h3><div class="hint">Escolhe o teu nome para veres logo quanto tens de pagar. Fica guardado neste aparelho.</div></div>
+    <select id="f-eu" aria-label="O teu nome"><option value="">Escolher o meu nome…</option>${pessoas.map(p=>`<option value="${h(p.id)}">${h(p.nome)}</option>`).join("")}</select></div>`;
   const d=rendaDe(r,m,vis),total=rendaTotal(m);
   let corpo;
   if(total==null&&!d.antes&&!d.pago&&!d.desconto)corpo=`<div class="hint">A renda de ${nomeMes(m).toLowerCase()} ainda não foi definida pelo tesoureiro.</div>`;
@@ -660,9 +654,16 @@ function cardEu(m,vis){
       <div><span>${d.aFavor?"A teu favor":"Falta pagar"}</span><b style="color:${d.falta?"var(--bad)":"var(--good)"}">${eur(d.falta||d.aFavor)}</b></div></div>
     ${d.desconto?`<div class="hint">Já tem descontados <b>${eur(d.desconto)}</b> de coisas que pagaste do teu bolso este mês.${d.devido<0?" Como passa do valor da renda, a casa fica a dever-te a diferença.":""} Se precisares do dinheiro, fala com o tesoureiro.</div>`:""}
     ${d.antes?`<div class="hint">Inclui ${d.antes>0?eur(d.antes)+" que ficou por pagar":eur(-d.antes)+" pagos a mais"} em meses anteriores.</div>`:""}`;
-  return `<div class="card eu"><div class="section-head"><h2>Olá, ${h(r.nome.split(" ")[0])}</h2><span class="chip ${d.estado[0]}">${d.estado[1]}</span></div>${corpo}
-    <div class="eu-links"><button class="linkbtn" data-act="tab" data-t="rendas">Ver a renda de todos</button></div></div>`;
+  const primeiro=r.nome.split(" ")[0];
+  return `<div class="card eu"><div class="section-head"><h2>Olá, ${h(primeiro)}</h2><span class="chip ${d.estado[0]}">${d.estado[1]}</span></div>${corpo}
+    <div class="eu-links"><button class="linkbtn" data-act="tab" data-t="rendas">Ver a renda de todos</button><button class="linkbtn" data-act="eu-mudar">Não és ${h(primeiro)}?</button></div></div>`;
 }
+function escolherEu(id){
+  S.eu=id||null;
+  try{if(id)localStorage.setItem("caixa-eu",id);else localStorage.removeItem("caixa-eu")}catch(e){}
+  render();
+}
+document.addEventListener("change",e=>{if(e.target.id==="f-eu"&&e.target.value)escolherEu(e.target.value)});
 
 function cardReembolsos(){
   const pr=porReembolsar();if(!pr.pend.length)return "";
@@ -734,7 +735,7 @@ function formCompra(noResumo){
       <label class="fld wide"><span>O que se comprou / onde</span><input id="f-c-desc" maxlength="120" placeholder="Ex.: Mercado, fruta e legumes da semana"></label>
       <label class="fld"><span>Valor (€)</span><input id="f-c-valor" inputmode="decimal" placeholder="0,00" required></label>
       <label class="fld"><span>Data</span><input id="f-c-data" type="date" value="${dataDefault()}" required></label>
-      ${gere()?`<label class="fld"><span>Quem comprou</span><select id="f-c-quem">${optsQuem(m)}</select></label>`:""}
+      <label class="fld"><span>Quem comprou</span><select id="f-c-quem">${optsMoradores(m,true)}</select></label>
       <label class="fld"><span>Pago com</span><select id="f-c-pago"><option value="bolso" selected>Do meu bolso (desconta na minha renda)</option><option value="fundo">Dinheiro do fundo de maneio</option></select></label>
       ${blocoFotos("c")}
     </div>
@@ -749,7 +750,7 @@ function formConta(noResumo){
       <label class="fld wide"><span>Nota (opcional)</span><input id="f-k-desc" maxlength="120" placeholder="Ex.: fatura de agosto, contador 1234"></label>
       <label class="fld"><span>Mês a que se refere</span><select id="f-k-mes">${optsMeses(m)}</select></label>
       <label class="fld"><span>Data do pagamento</span><input id="f-k-data" type="date" value="${dataDefault()}" required></label>
-      <label class="fld"><span>Quem pagou</span><select id="f-k-quem">${optsQuem(m)}</select></label>
+      <label class="fld"><span>Quem pagou</span><select id="f-k-quem">${optsMoradores(m,true)}</select></label>
       <label class="fld"><span>Pago com</span><select id="f-k-pago"><option value="fundo">Dinheiro do fundo de maneio</option><option value="bolso">Do meu bolso (desconta na minha renda)</option></select></label>
       ${blocoFotos("k")}
     </div>
@@ -758,10 +759,10 @@ function formConta(noResumo){
 
 /* ---------- tesoureiros: só eles mexem em rendas, fundo e definições; toda a gente vê e regista compras e contas ---------- */
 const gere=()=>S.canWrite&&S.tes;
-const SO_TES_FORMS=["conta","ajuste","renda","renda-total","previsao","fundo","config"];
-const SO_TES_ACTS=["ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir"];
+const SO_TES_FORMS=["conta","ajuste","renda","renda-total","previsao","fundo","config","morador","morador-edit"];
+const SO_TES_ACTS=["ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir","morador-editar","apagar-morador","tes-aprovar","tes-recusar","tes-retirar"];
 const semPermissao=()=>toast("err","Só os tesoureiros podem fazer isto.");
-const eMeu=x=>S.canWrite&&x.criadoPor===S.me.id;
+const eMeu=x=>S.canWrite&&!!S.autor&&x.criadoPor===S.autor;
 const podeAnular=x=>gere()||(eMeu(x)&&x.tipo==="compra");
 document.addEventListener("toggle",e=>{if(e.target.id==="det-prev")S.detAberto=e.target.open},true);
 
@@ -916,8 +917,8 @@ function tHistorico(){
 
 function tDefinicoes(){
   const c=S.config,m=S.mes,pm=(c.plafondMes||{})[m];
-  if(!gere())return membrosCard()+`<div class="card"><h2>Definições</h2><div class="breakdown" style="margin-top:10px"><div><span>Plafond mensal de compras</span><span class="num">${eur(c.plafond)}</span></div><div><span>Saldo inicial do fundo</span><span class="num">${eur(c.fundoInicial)}</span></div></div></div>`;
-  return membrosCard()+`<form class="card form" data-form="config" autocomplete="off"><h3>A casa e o dinheiro</h3>
+  if(!gere())return pessoasCard()+tesoureirosCard()+`<div class="card"><h2>Definições</h2><div class="breakdown" style="margin-top:10px"><div><span>Plafond mensal de compras</span><span class="num">${eur(c.plafond)}</span></div><div><span>Saldo inicial do fundo</span><span class="num">${eur(c.fundoInicial)}</span></div></div></div>`;
+  return pessoasCard()+tesoureirosCard()+`<form class="card form" data-form="config" autocomplete="off"><h3>A casa e o dinheiro</h3>
     <div class="grid">
       <label class="fld wide"><span>Nome da casa / associação</span><input id="f-s-nome" maxlength="80" value="${h(c.nome||"")}"></label>
       <label class="fld"><span>Plafond mensal de compras (€)</span><input id="f-s-plafond" inputmode="decimal" value="${eurNum(c.plafond)}"></label>
@@ -927,9 +928,8 @@ function tDefinicoes(){
     </div>
     <div class="form-foot">${btnGuardar("Guardar definições")}<span class="hint">O saldo inicial é o dinheiro que havia no fundo quando começaram a usar esta página.</span></div></form>`;
 }
-/* ---------- membros (só o administrador aprova, muda o tipo e dá permissão de tesoureiro) ---------- */
-const NOMES_TIPO={pendente:"à espera",visitante:"visitante",morador:"morador",comensal:"comensal",meio:"meio comensal"};
-const OPC_TIPO=[["morador","Morador (vive cá)"],["comensal","Comensal (só come cá)"],["meio","Meio comensal (paga metade de um comensal)"],["visitante","Visitante (vê e regista compras, não paga renda)"]];
+/* ---------- pessoas da casa e tesoureiros (só os tesoureiros mexem) ---------- */
+const OPC_TIPO=[["morador","Morador (vive cá)"],["comensal","Comensal (só come cá)"],["meio","Meio comensal (paga metade de um comensal)"]];
 function optsMesesTodos(sel,vazio){
   let o=vazio?`<option value="">${vazio}</option>`:"";
   for(let i=-24;i<=6;i++){const m=addMes(hojeMes(),i);o+=`<option value="${m}"${m===sel?" selected":""}>${nomeMes(m)}</option>`}
@@ -937,45 +937,58 @@ function optsMesesTodos(sel,vazio){
   return o;
 }
 function avatar(u,cls){return u.foto?`<img class="avatar${cls?" "+cls:""}" src="${h(u.foto)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar vazio${cls?" "+cls:""}">${h((u.nome||"?").trim().charAt(0).toUpperCase())}</span>`}
-function linhaMembro(u,admin){
-  const com=u.tipo==="comensal"||u.tipo==="meio";
-  const chips=`<span class="chip ${u.tipo==="pendente"?"warn":u.tipo==="visitante"?"neutral":"good"}">${NOMES_TIPO[u.tipo]||u.tipo}${com&&u.valorFixo!=null?" · fixo "+eur(u.valorFixo):""}</span>${u.tesoureiro?'<span class="chip good">tesoureiro</span>':""}${u.admin?'<span class="chip neutral">admin</span>':""}${u.bloqueado?'<span class="chip bad">sem acesso</span>':""}`;
-  const periodo=u.tipo!=="pendente"&&u.tipo!=="visitante"&&(u.entrada||u.saida)?`<span class="muted">${u.entrada?"desde "+nomeMesCurto(u.entrada):""}${u.saida?" · saiu no fim de "+nomeMesCurto(u.saida):""}</span>`:"";
-  const aEditar=admin&&(S.editMembro===u.id||u.tipo==="pendente");
-  const topo=`<div class="membro-topo">${avatar(u)}<div class="membro-nome"><b>${h(u.nome)}</b>${admin&&u.email?`<span class="muted">${h(u.email)}</span>`:""}<div class="membro-chips">${chips}${periodo}</div></div>${admin&&!aEditar?`<button class="btn small" data-act="membro-editar" data-id="${h(u.id)}">Editar</button>`:""}</div>`;
-  if(!aEditar)return `<div class="membro">${topo}</div>`;
-  const p="f-u-"+u.id+"-",tipoAtual=u.tipo==="pendente"?"morador":u.tipo,c=S.confirm;
-  const recusar=c&&c.act==="membro-apagar"&&c.id===u.id
-    ?`<span class="confirm">Recusar e apagar o pedido de ${h(u.nome)}? <button type="button" class="btn small danger" data-act="conf-sim">Recusar</button><button type="button" class="btn small" data-act="conf-nao">Cancelar</button></span>`
-    :`<button type="button" class="btn danger" data-act="membro-apagar" data-id="${h(u.id)}">Recusar</button>`;
-  return `<div class="membro edit">${topo}<form data-form="membro" data-id="${h(u.id)}" class="grid" autocomplete="off">
-    <label class="fld"><span>Nome</span><input id="${p}nome" maxlength="80" value="${h(u.nome)}"></label>
-    <label class="fld"><span>Tipo</span><select id="${p}tipo">${OPC_TIPO.map(([t,l])=>`<option value="${t}"${t===tipoAtual?" selected":""}>${l}</option>`).join("")}</select></label>
-    <label class="fld"><span>Valor fixo por mês (comensais e meios)</span><input id="${p}fixo" inputmode="decimal" placeholder="Vazio = paga a sua parte" value="${u.valorFixo!=null?eurNum(u.valorFixo):""}"></label>
-    <label class="fld"><span>Na casa desde</span><select id="${p}entrada">${optsMesesTodos(u.entrada||S.mes,"")}</select></label>
-    <label class="fld"><span>Saiu no fim de</span><select id="${p}saida">${optsMesesTodos(u.saida||"","Ainda cá está")}</select></label>
-    <label class="check fld wide"><input type="checkbox" id="${p}tes"${u.tesoureiro?" checked":""}${u.admin?" disabled":""}><span>Tesoureiro: gere contas, rendas, fundo de maneio e definições${u.admin?" (o administrador é sempre tesoureiro)":""}</span></label>
-    ${u.admin||u.tipo==="pendente"?"":`<label class="check fld wide"><input type="checkbox" id="${p}bloq"${u.bloqueado?" checked":""}><span>Sem acesso: não consegue entrar na app (o histórico dela fica)</span></label>`}
-    <div class="form-foot fld wide">${btnGuardar(u.tipo==="pendente"?"Aprovar":"Guardar")}${u.tipo==="pendente"?recusar:'<button type="button" class="btn" data-act="membro-fechar">Cancelar</button>'}
-      <span class="hint">O tipo e o valor fixo contam a partir de ${nomeMes(S.mes).toLowerCase()}, o mês que estás a ver. Quem saiu da casa: põe o mês em «Saiu no fim de», não mudes o tipo.</span></div>
-  </form></div>`;
+function pessoasCard(){
+  const m=S.mes,tes=gere(),todos=S.moradores.slice().sort((a,b)=>(a.saida?1:0)-(b.saida?1:0)||a.nome.localeCompare(b.nome,"pt"));
+  const usados=new Set(allMovs().map(x=>x.morador).filter(Boolean));
+  const linhas=todos.map(r=>{
+    const com=eComensal(r);
+    if(tes&&S.editMorador===r.id)return `<div class="membro edit"><form data-form="morador-edit" data-id="${h(r.id)}" class="grid" autocomplete="off">
+      <label class="fld"><span>Nome</span><input id="f-e-nome" maxlength="80" value="${h(r.nome)}"></label>
+      <label class="fld"><span>Tipo</span><select id="f-e-tipo">${OPC_TIPO.map(([t,l])=>`<option value="${t}"${t===r.tipo?" selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="fld"><span>Valor fixo por mês (comensais e meios)</span><input id="f-e-fixo" inputmode="decimal" placeholder="Vazio = paga a sua parte" value="${r.valorFixo!=null?eurNum(r.valorFixo):""}"></label>
+      <label class="fld"><span>Na casa desde</span><select id="f-e-entrada">${optsMesesTodos(r.entrada||m,"")}</select></label>
+      <label class="fld"><span>Saiu no fim de</span><select id="f-e-saida">${optsMesesTodos(r.saida||"","Ainda cá está")}</select></label>
+      <div class="form-foot fld wide">${btnGuardar("Guardar")}<button type="button" class="btn" data-act="morador-fechar">Cancelar</button><span class="hint">O tipo e o valor fixo contam a partir de ${nomeMes(m).toLowerCase()}, o mês que estás a ver.</span></div></form></div>`;
+    let acts="";
+    if(tes){
+      const c=S.confirm;
+      acts=c&&c.act==="apagar-morador"&&c.id===r.id
+        ?`<span class="confirm">Apagar ${h(r.nome)}? <button class="btn small danger" data-act="conf-sim">Apagar</button><button class="btn small" data-act="conf-nao">Cancelar</button></span>`
+        :`<button class="btn small" data-act="morador-editar" data-id="${h(r.id)}">Editar</button>${usados.has(r.id)?"":`<button class="linkbtn" data-act="apagar-morador" data-id="${h(r.id)}" style="color:var(--bad)">Apagar</button>`}`;
+    }
+    return `<div class="membro"><div class="membro-topo">${avatar(r)}<div class="membro-nome"><b>${h(r.nome)}</b><div class="membro-chips"><span class="chip ${com?"neutral":"good"}">${nomeTipo(r)}${com&&r.valorFixo!=null?" · fixo "+eur(r.valorFixo):""}</span><span class="muted">${r.entrada?"desde "+nomeMesCurto(r.entrada):""}${r.saida?" · saiu no fim de "+nomeMesCurto(r.saida):""}</span></div></div>${acts}</div></div>`;
+  }).join("");
+  const add=tes?`<form data-form="morador" class="grid" style="align-items:end;margin-top:14px" autocomplete="off">
+      <label class="fld"><span>Nome</span><input id="f-m-nome" maxlength="80" placeholder="Nome" required></label>
+      <label class="fld"><span>Tipo</span><select id="f-m-tipo">${OPC_TIPO.map(([t,l])=>`<option value="${t}">${l}</option>`).join("")}</select></label>
+      <label class="fld"><span>Valor fixo por mês (comensais e meios)</span><input id="f-m-fixo" inputmode="decimal" placeholder="Vazio = paga a sua parte"></label>
+      <label class="fld"><span>Na casa desde</span><select id="f-m-entrada">${optsMeses(m)}</select></label>
+      <div>${btnGuardar("Adicionar pessoa")}</div></form>`:"";
+  return `<div class="card"><div class="section-head"><h2>Pessoas da casa</h2><span class="hint">Moradores pagam a renda toda. Comensais pagam a sua parte das despesas marcadas na calculadora da renda (ou um valor fixo); meios comensais pagam metade de um comensal.${tes?" Quem sai da casa: edita e marca o mês em que saiu, para o histórico não mudar.":""}</span></div>
+    ${todos.length?`<div class="membros">${linhas}</div>`:'<div class="empty">Ainda não há pessoas registadas.</div>'}${add}</div>`;
 }
-function membrosCard(){
-  const admin=!!S.me.admin;
-  const lista=S.users.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt"));
-  if(!admin){
-    const casa=lista.filter(u=>u.tipo!=="pendente"&&!u.bloqueado);
-    return `<div class="card"><div class="section-head"><h2>Pessoas da casa</h2><span class="hint">Quem aprova pessoas e escolhe os tesoureiros é o administrador.</span></div><div class="membros">${casa.map(u=>linhaMembro(u,false)).join("")}</div></div>`;
-  }
-  const pend=lista.filter(u=>u.tipo==="pendente"),ativos=lista.filter(u=>u.tipo!=="pendente"&&!u.bloqueado),bloq=lista.filter(u=>u.tipo!=="pendente"&&u.bloqueado);
-  return `<div class="card"><div class="section-head"><h2>Membros</h2><span class="hint">Quem entra com a conta Google fica à espera até o aprovares.</span></div>
-    ${pend.length?`<h3 class="sub-h">À espera de aprovação (${pend.length})</h3><div class="membros">${pend.map(u=>linhaMembro(u,true)).join("")}</div>`:`<div class="hint">Não há pedidos à espera. Para alguém se juntar, manda-lhe o endereço da app.</div>`}
-    <h3 class="sub-h">Com acesso (${ativos.length})</h3><div class="membros">${ativos.map(u=>linhaMembro(u,true)).join("")}</div>
-    ${bloq.length?`<h3 class="sub-h">Sem acesso (${bloq.length})</h3><div class="membros">${bloq.map(u=>linhaMembro(u,true)).join("")}</div>`:""}
-    <div class="form-foot"><a class="btn small" href="/api/copia-seguranca">Descarregar cópia de segurança</a><span class="hint">A cópia tem todos os registos; as fotos dos talões estão na pasta <code>dados/fotos</code> do servidor.</span></div></div>`;
+function tesoureirosCard(){
+  const tes=gere(),lista=S.tesoureiros.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt"));
+  const pend=lista.filter(u=>u.estado==="pendente"),ativos=lista.filter(u=>u.estado==="ativo"),bloq=lista.filter(u=>u.estado==="bloqueado");
+  const linha=u=>{
+    let acts="";
+    if(tes){
+      const c=S.confirm,aConfirmar=c&&c.id===u.id&&(c.act==="tes-recusar"||c.act==="tes-retirar");
+      if(aConfirmar)acts=`<span class="confirm">${c.act==="tes-recusar"?"Recusar o pedido de "+h(u.nome)+"?":"Tirar "+h(u.nome)+" de tesoureiro?"} <button class="btn small danger" data-act="conf-sim">Sim</button><button class="btn small" data-act="conf-nao">Cancelar</button></span>`;
+      else if(u.estado==="pendente")acts=`<button class="btn small primary" data-act="tes-aprovar" data-id="${h(u.id)}">Aprovar</button><button class="btn small danger" data-act="tes-recusar" data-id="${h(u.id)}">Recusar</button>`;
+      else if(u.estado==="ativo"&&ativos.length>1)acts=`<button class="linkbtn" data-act="tes-retirar" data-id="${h(u.id)}" style="color:var(--bad)">${S.me&&u.id===S.me.id?"Deixar de ser tesoureiro":"Tirar de tesoureiro"}</button>`;
+      else if(u.estado==="bloqueado")acts=`<button class="linkbtn" data-act="tes-aprovar" data-id="${h(u.id)}">Voltar a aprovar</button>`;
+    }
+    return `<div class="membro"><div class="membro-topo">${avatar(u)}<div class="membro-nome"><b>${h(u.nome)}${S.me&&u.id===S.me.id?' <span class="muted">(tu)</span>':""}</b>${tes&&u.email?`<span class="muted">${h(u.email)}</span>`:""}</div>${acts}</div></div>`;
+  };
+  return `<div class="card"><div class="section-head"><h2>Tesoureiros</h2><span class="hint">Os tesoureiros entram com a conta Google e gerem contas, rendas, fundo e definições. Um tesoureiro novo fica à espera até outro tesoureiro o aprovar.</span></div>
+    ${tes&&pend.length?`<h3 class="sub-h">À espera de aprovação (${pend.length})</h3><div class="membros">${pend.map(linha).join("")}</div><h3 class="sub-h">Tesoureiros</h3>`:""}
+    <div class="membros">${ativos.map(linha).join("")||'<div class="empty">Ainda não há tesoureiros. Quem entrar primeiro fica logo tesoureiro.</div>'}</div>
+    ${tes&&bloq.length?`<h3 class="sub-h">Retirados (${bloq.length})</h3><div class="membros">${bloq.map(linha).join("")}</div>`:""}
+    ${!S.me?'<div class="form-foot"><button class="btn" data-act="entrar">Entrar como tesoureiro</button></div>':""}
+    ${tes?'<div class="form-foot"><a class="btn small" href="/api/copia-seguranca">Descarregar cópia de segurança</a><span class="hint">Tem todos os registos; as fotos dos talões estão na pasta <code>dados/fotos</code> do servidor.</span></div>':""}</div>`;
 }
 
-/* ---------- names of who registered ---------- */
 function pedirNomes(){}
 
 /* ---------- writes ---------- */
@@ -1011,7 +1024,7 @@ const handlers={
   async compra(){
     const cent=parseValor(val("f-c-valor"));if(!cent)return toast("err","Escreve o valor, por exemplo 12,50");
     const data=val("f-c-data");if(!data)return toast("err","Escolhe a data da compra");
-    const quem=gere()?val("f-c-quem"):S.me.id,pago=val("f-c-pago");
+    const quem=val("f-c-quem"),pago=val("f-c-pago");
     if(pago==="bolso"&&!quem)return toast("err","Diz quem pagou do bolso, para se saber a quem reembolsar");
     const fotos=await fotosDoForm("c");if(fotos===null)return;
     const ok=await addMov({tipo:"compra",mes:data.slice(0,7),data,cent,descricao:val("f-c-desc").trim(),morador:quem,moradorNome:nomeMorador(quem),pagoPor:pago,reembolsado:false,fotos});
@@ -1077,27 +1090,42 @@ const handlers={
     const ok=await gravar(()=>guardarConfig(p),()=>Object.assign(S.config,p));
     if(ok){S.reset="f-s-";S.fresh=true;toast("ok","Definições guardadas")}
   },
-  async membro(form){
-    if(!S.me.admin)return toast("err","Só o administrador gere os membros.");
-    const id=form.dataset.id,p="f-u-"+id+"-",u=S.users.find(x=>x.id===id);if(!u)return;
-    const nome=val(p+"nome").trim();if(!nome)return toast("err","O nome não pode ficar vazio");
-    const tipo=val(p+"tipo"),fx=val(p+"fixo").trim(),com=tipo==="comensal"||tipo==="meio";
+  async dev(){
+    try{await api("POST","/api/entrar/dev",{email:val("d-email"),nome:val("d-nome")});location.reload()}
+    catch(e){toast("err",e.message||"Não deu para entrar")}
+  },
+  async morador(){
+    const nome=val("f-m-nome").trim();if(!nome)return toast("err","Escreve o nome");
+    const tipo=val("f-m-tipo"),fx=val("f-m-fixo").trim(),com=tipo==="comensal"||tipo==="meio";
     let valorFixo=null;if(com&&fx!==""){valorFixo=fx==="0"||fx==="0,00"?0:parseValor(fx);if(valorFixo==null)return toast("err","O valor fixo tem de ser um valor, por exemplo 60")}
-    const entrada=val(p+"entrada")||null,saida=val(p+"saida")||null;
+    const entrada=val("f-m-entrada")||S.mes;
+    let novo=null;
+    const ok=await gravar(async()=>{
+      novo=await api("POST","/api/pessoas",{nome,tipo,valorFixo,entrada,saida:null});
+      /* meses com a regra já guardada a partir da entrada: a pessoa nova entra nessa regra */
+      const dm=JSON.parse(JSON.stringify(S.config.divisaoMes||{}));let mudou=false;
+      Object.keys(dm).forEach(k=>{if(k<entrada)return;const d=dm[k];
+        if(com){d.comensais=(d.comensais||[]).concat([novo.id]);if(tipo==="meio")d.meios=(d.meios||[]).concat([novo.id]);if(valorFixo!=null){d.fixos=d.fixos||{};d.fixos[novo.id]=valorFixo}}
+        if(d.pessoas)d.pessoas.push(novo.id);mudou=true});
+      if(mudou)await guardarConfig({divisaoMes:dm});
+    });
+    if(ok){S.reset="f-m-";toast("ok",nome+" adicionado")}
+  },
+  async "morador-edit"(form){
+    const id=form.dataset.id,r=S.moradores.find(x=>x.id===id);if(!r)return;
+    const nome=val("f-e-nome").trim();if(!nome)return toast("err","Escreve o nome");
+    const tipo=val("f-e-tipo"),fx=val("f-e-fixo").trim(),com=tipo==="comensal"||tipo==="meio";
+    let valorFixo=null;if(com&&fx!==""){valorFixo=fx==="0"||fx==="0,00"?0:parseValor(fx);if(valorFixo==null)return toast("err","O valor fixo tem de ser um valor, por exemplo 60")}
+    const entrada=val("f-e-entrada")||null,saida=val("f-e-saida")||null;
     if(entrada&&saida&&saida<entrada)return toast("err","O mês de saída não pode ser antes do mês de entrada");
-    const tesEl=document.getElementById(p+"tes"),bloqEl=document.getElementById(p+"bloq");
-    const corpo={nome,tipo,valorFixo,entrada,saida,tesoureiro:tesEl?tesEl.checked:!!u.tesoureiro};
-    if(bloqEl)corpo.bloqueado=bloqEl.checked;
     /* a regra de divisão já guardada muda só a partir do mês que estás a ver */
     const dm=JSON.parse(JSON.stringify(S.config.divisaoMes||{}));let mudou=false;
-    const eraCasa=["morador","comensal","meio"].includes(u.tipo),fica=["morador","comensal","meio"].includes(tipo);
-    if(tipo!==u.tipo||valorFixo!==u.valorFixo)Object.keys(dm).forEach(k=>{if(k<S.mes)return;const d=dm[k];
+    if(tipo!==r.tipo||valorFixo!==r.valorFixo)Object.keys(dm).forEach(k=>{if(k<S.mes)return;const d=dm[k];
       d.comensais=(d.comensais||[]).filter(x=>x!==id);d.meios=(d.meios||[]).filter(x=>x!==id);d.fixos=d.fixos||{};delete d.fixos[id];
       if(com){d.comensais.push(id);if(tipo==="meio")d.meios.push(id);if(valorFixo!=null)d.fixos[id]=valorFixo}
-      if(d.pessoas){d.pessoas=d.pessoas.filter(x=>x!==id);if(fica)d.pessoas.push(id)}
       mudou=true});
-    const ok=await gravar(async()=>{await api("PATCH","/api/utilizadores/"+encodeURIComponent(id),corpo);if(mudou)await guardarConfig({divisaoMes:dm})});
-    if(ok){S.editMembro=null;toast("ok",u.tipo==="pendente"?nome+" foi aprovado":eraCasa!==fica||tipo!==u.tipo?"Guardado. Conta a partir de "+nomeMes(S.mes).toLowerCase():"Guardado")}
+    const ok=await gravar(async()=>{await api("PATCH","/api/pessoas/"+encodeURIComponent(id),{nome,tipo,valorFixo,entrada,saida});if(mudou)await guardarConfig({divisaoMes:dm})});
+    if(ok){S.editMorador=null;toast("ok",mudou?"Guardado. Conta a partir de "+nomeMes(S.mes).toLowerCase():"Guardado")}
   }
 };
 document.addEventListener("submit",e=>{const f=e.target.closest("form[data-form]");if(!f)return;e.preventDefault();if(SO_TES_FORMS.includes(f.dataset.form)&&!gere())return semPermissao();const fn=handlers[f.dataset.form];if(fn)fn(f)});
@@ -1111,7 +1139,7 @@ async function addDespesa(){
   if(await gravar(()=>guardarConfig({despesas:lista}),()=>{S.config.despesas=lista})){S.reset="f-d-";toast("ok","Despesa «"+nome+"» adicionada")}
 }
 /* ---------- clicks ---------- */
-function ir(tab){S.tab=tab;S.confirm=null;S.rendaEdit=null;S.editMembro=null;S.resumoForm=null;S.verFoto=null;S.fresh=true;render();window.scrollTo({top:0})}
+function ir(tab){S.tab=tab;S.confirm=null;S.rendaEdit=null;S.editMorador=null;S.vista=null;S.resumoForm=null;S.verFoto=null;S.fresh=true;render();window.scrollTo({top:0})}
 function mudarMes(m){S.mes=m;S.confirm=null;S.rendaEdit=null;S.ajusteEdit=null;S.fresh=true;render()}
 document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;
@@ -1122,9 +1150,13 @@ document.addEventListener("click",async e=>{
   if(a==="ver-todos"){S.verTodos=true;S.filtro="tudo";return render()}
   if(a==="ver-menos"){S.verTodos=false;S.filtro="tudo";return render()}
   if(a==="sair"){await fetch("/api/sair",{method:"POST",credentials:"same-origin"}).catch(()=>{});location.reload();return}
-  if(a==="membro-editar"){S.editMembro=id;return render()}
-  if(a==="membro-fechar"){S.editMembro=null;return render()}
-  if(a==="membro-apagar"){S.confirm={act:a,id};return render()}
+  if(a==="entrar"){S.vista="entrar";S.fresh=true;render();window.scrollTo({top:0});return}
+  if(a==="entrar-voltar"){S.vista=null;S.fresh=true;return render()}
+  if(a==="eu-mudar")return escolherEu(null);
+  if(a==="morador-editar"){S.editMorador=id;S.reset="f-e-";return render()}
+  if(a==="morador-fechar"){S.editMorador=null;return render()}
+  if(a==="apagar-morador"||a==="tes-recusar"||a==="tes-retirar"){S.confirm={act:a,id};return render()}
+  if(a==="tes-aprovar"){const u=S.tesoureiros.find(x=>x.id===id);if(u&&await gravar(()=>api("PATCH","/api/tesoureiros/"+encodeURIComponent(id),{estado:"ativo"})))toast("ok",u.nome+" é agora tesoureiro");return}
   if(a==="mes")return mudarMes(addMes(S.mes,+b.dataset.n));
   if(a==="hoje")return mudarMes(hojeMes());
   if(a==="ir-mes"){S.mes=b.dataset.m;return ir("resumo")}
@@ -1141,7 +1173,9 @@ document.addEventListener("click",async e=>{
     const c=S.confirm;S.confirm=null;if(!c)return;
     if(c.act==="desp-rm"){const lista=despesas().map(d=>d.id===c.id?Object.assign({},d,{removida:true}):Object.assign({},d)),d=lista.find(x=>x.id===c.id);
       if(d&&await gravar(()=>guardarConfig({despesas:lista}),()=>{S.config.despesas=lista}))toast("ok","Despesa «"+d.nome+"» removida");return}
-    if(c.act==="membro-apagar"){const u=S.users.find(x=>x.id===c.id);if(u&&await gravar(()=>api("DELETE","/api/utilizadores/"+encodeURIComponent(u.id))))toast("ok","Pedido de "+u.nome+" recusado");return}
+    if(c.act==="apagar-morador"){const r=S.moradores.find(x=>x.id===c.id);if(r&&await gravar(()=>api("DELETE","/api/pessoas/"+encodeURIComponent(r.id))))toast("ok",r.nome+" apagado");return}
+    if(c.act==="tes-recusar"){const u=S.tesoureiros.find(x=>x.id===c.id);if(u&&await gravar(()=>api("DELETE","/api/tesoureiros/"+encodeURIComponent(u.id))))toast("ok","Pedido de "+u.nome+" recusado");return}
+    if(c.act==="tes-retirar"){const u=S.tesoureiros.find(x=>x.id===c.id);if(u&&await gravar(()=>api("PATCH","/api/tesoureiros/"+encodeURIComponent(u.id),{estado:"bloqueado"}))){toast("ok",u.nome+" deixou de ser tesoureiro");if(S.me&&u.id===S.me.id)setTimeout(()=>location.reload(),900)}return}
     const x=allMovs().find(y=>y.id===c.id);if(!x)return render();
     if(c.act==="anular"&&!podeAnular(x))return semPermissao();
     if(c.act!=="anular"&&!gere())return semPermissao();
@@ -1200,16 +1234,18 @@ async function exportar(q){
   setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
-/* ---------- arranque: login com Google, aprovação e dados do servidor ---------- */
+/* ---------- arranque: dados do servidor (sem login) e entrada dos tesoureiros ---------- */
 function mostrar(html){app.innerHTML=`<div class="entrada">${html}</div>`}
 async function carregar(){
   const r=await api("GET","/api/estado");
-  S.me=r.eu;S.users=r.utilizadores||[];
-  S.tes=!!(S.me.tesoureiro||S.me.admin);
-  S.moradores=S.users.filter(u=>["morador","comensal","meio"].includes(u.tipo)).map(u=>({id:u.id,nome:u.nome,tipo:u.tipo,valorFixo:u.valorFixo,entrada:u.entrada,saida:u.saida}));
-  S.names={};S.users.forEach(u=>{S.names[u.id]=u.nome});
+  S.me=r.eu;S.autor=r.autor;S.tes=!!(S.me&&S.me.estado==="ativo");
+  S.moradores=r.pessoas||[];
+  S.tesoureiros=r.tesoureiros||[];
+  S.names={};S.tesoureiros.forEach(u=>{S.names[u.id]=u.nome});
+  if(S.me)S.names[S.me.id]=S.me.nome;
   S.config=Object.assign({},DEF,r.config||{},{_existe:!!(r.config&&Object.keys(r.config).length)});
   S.movs={todos:r.movimentos||[]};
+  if(S.me&&S.vista==="entrar")S.vista=null;
   document.title=(S.config.nome||DEF.nome)+" · Caixa da Casa";
   schedule();
 }
@@ -1221,43 +1257,37 @@ function ouvir(){
   es.onerror=()=>{};
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)carregar().catch(()=>{})});
 }
-async function ecraEntrar(pub){
-  mostrar(`<div class="card entrada-card"><div class="eyebrow">Livro de caixa da casa</div><h1>${h(pub.nomeCasa)}</h1>
-    <p>Entra com a tua conta Google para veres o plafond, a tua renda e registares as compras da casa.</p>
-    <div id="g-botao" class="g-botao">${pub.googleClientId?'<span class="muted">A carregar o botão do Google…</span>':'<span class="muted">O servidor ainda não tem o login do Google configurado (falta GOOGLE_CLIENT_ID).</span>'}</div>
-    ${pub.devLogin?`<form data-dev class="grid dev" autocomplete="off"><div class="hint" style="grid-column:1/-1">Login de teste (só neste computador)</div>
+function vistaEntrar(){
+  const p=S.pub||{},haTes=S.tesoureiros.some(u=>u.estado==="ativo");
+  return `<div class="entrada"><div class="card entrada-card"><div class="eyebrow">${h(S.config.nome||p.nomeCasa||DEF.nome)}</div><h1>Entrar como tesoureiro</h1>
+    <p>Para ver as contas e registar compras não precisas de conta. Só os tesoureiros entram, para gerir rendas, contas, fundo de maneio e definições.</p>
+    <p>${haTes?"Depois de entrares, outro tesoureiro tem de te aprovar.":"Ainda não há nenhum tesoureiro: quem entrar primeiro fica logo tesoureiro."}</p>
+    <div id="g-botao" class="g-botao">${p.googleClientId?'<span class="muted">A carregar o botão do Google…</span>':'<span class="muted">O servidor ainda não tem o login do Google configurado (falta GOOGLE_CLIENT_ID).</span>'}</div>
+    ${p.devLogin?`<form data-form="dev" class="grid dev" autocomplete="off"><div class="hint" style="grid-column:1/-1">Login de teste (só neste computador)</div>
       <label class="fld"><span>Email</span><input id="d-email" type="email" required></label>
       <label class="fld"><span>Nome</span><input id="d-nome"></label>
       <div><button class="btn" type="submit">Entrar para testar</button></div></form>`:""}
-  </div>`);
-  const dev=app.querySelector("form[data-dev]");
-  if(dev)dev.addEventListener("submit",async e=>{e.preventDefault();try{await api("POST","/api/entrar/dev",{email:document.getElementById("d-email").value,nome:document.getElementById("d-nome").value});location.reload()}catch(err){toast("err",err.message||"Não deu para entrar")}});
-  if(!pub.googleClientId)return;
+    <div class="form-foot"><button class="btn" data-act="entrar-voltar">← Voltar</button></div></div></div>`;
+}
+let gisIniciado=false;
+async function montarGoogle(){
+  const p=S.pub||{};if(!p.googleClientId)return;
   for(let i=0;i<100&&!(window.google&&google.accounts&&google.accounts.id);i++)await new Promise(r=>setTimeout(r,100));
-  const el=document.getElementById("g-botao");
+  const el=document.getElementById("g-botao");if(!el||el.dataset.pronto)return;
   if(!(window.google&&google.accounts&&google.accounts.id)){el.innerHTML='<span class="muted">Não foi possível carregar o login do Google. Verifica a ligação e recarrega a página.</span>';return}
-  google.accounts.id.initialize({client_id:pub.googleClientId,callback:async r=>{
-    try{await api("POST","/api/entrar/google",{credential:r.credential});location.reload()}
-    catch(err){toast("err",err.message||"Não foi possível entrar")}
-  }});
-  el.innerHTML="";
+  if(!gisIniciado){
+    google.accounts.id.initialize({client_id:p.googleClientId,callback:async r=>{
+      try{await api("POST","/api/entrar/google",{credential:r.credential});location.reload()}
+      catch(err){toast("err",err.message||"Não foi possível entrar")}
+    }});
+    gisIniciado=true;
+  }
+  el.innerHTML="";el.dataset.pronto="1";
   google.accounts.id.renderButton(el,{theme:"outline",size:"large",shape:"pill",text:"continue_with",locale:"pt-PT"});
 }
-function ecraEspera(eu,nomeCasa){
-  mostrar(`<div class="card entrada-card"><div class="eyebrow">Livro de caixa da casa</div><h1>${h(nomeCasa)}</h1>
-    <div class="membro-topo" style="margin:14px 0">${avatar(eu)}<div class="membro-nome"><b>${h(eu.nome)}</b><span class="muted">${h(eu.email||"")}</span></div></div>
-    <p>A tua conta está registada. Falta o administrador da casa aprovar-te; depois disso vês tudo aqui.</p>
-    <div class="form-foot"><button class="btn primary" data-act="recarregar">Já fui aprovado</button><button class="btn" data-act="sair">Sair</button></div></div>`);
-}
-document.addEventListener("click",e=>{if(e.target.closest('[data-act="recarregar"]'))location.reload()});
 async function arranque(){
-  let pub={nomeCasa:DEF.nome,googleClientId:"",devLogin:false};
-  try{pub=await api("GET","/api/publico")}catch(e){}
-  let eu;
-  try{eu=await api("GET","/api/eu")}
-  catch(e){if(e.status===401)return ecraEntrar(pub);return mostrar(`<div class="card entrada-card"><h1>Sem ligação</h1><p>Não foi possível falar com o servidor. Recarrega a página daqui a pouco.</p></div>`)}
-  if(!eu.aprovado)return ecraEspera(eu.eu,pub.nomeCasa);
-  try{await carregar()}catch(e){return mostrar(`<div class="card entrada-card"><h1>Erro</h1><p>${h(e.message||"Não foi possível carregar os dados.")}</p></div>`)}
+  try{S.pub=await api("GET","/api/publico")}catch(e){S.pub={nomeCasa:DEF.nome,googleClientId:"",devLogin:false}}
+  try{await carregar()}catch(e){return mostrar(`<div class="card entrada-card"><h1>Sem ligação</h1><p>Não foi possível falar com o servidor. Recarrega a página daqui a pouco.</p></div>`)}
   S.loading=false;S.fresh=true;render();
   ouvir();
 }
