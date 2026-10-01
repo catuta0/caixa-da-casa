@@ -294,6 +294,7 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}
 <div class="wrap" id="app"><div class="loading">A abrir o livro de caixa…</div></div>
 <div id="toast" hidden></div>
 <input type="file" id="anexo" accept="image/*,application/pdf" multiple hidden>
+<input type="file" id="importar-ficheiro" accept="application/json,.json" hidden>
 
 <script>
 (function(){
@@ -494,6 +495,8 @@ function render(){
   app.innerHTML=S.loading?'<div class="loading">A abrir o livro de caixa…</div>':page();
   for(const id in vals){const el=document.getElementById(id);if(!el)continue;if(el.type==="checkbox")el.checked=vals[id];else if(el.tagName!=="SELECT"||[...el.options].some(o=>o.value===vals[id]))el.value=vals[id]}
   if(actId){const el=document.getElementById(actId);if(el){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(e){}}}
+  const quemEl=document.getElementById("f-c-quem");
+  if(quemEl&&!quemEl.value&&S.eu&&[...quemEl.options].some(o=>o.value===S.eu))quemEl.value=S.eu;
   rotularTabelas();
   if(S.vista==="entrar")montarGoogle();
   atualizarPrev();
@@ -552,9 +555,9 @@ function linhaMov(x,opts){
     else chip=x.reembolsado?`<span class="chip good">pago em dinheiro a ${h(x.moradorNome||"?")}</span>`:`<span class="chip warn">descontado na renda de ${nomeMesCurto(x.mes)} de ${h(x.moradorNome||"?")}</span>`;
   }
   if(x.tipo==="fundo")meta.push(x.sentido==="entrada"?"entrada":"saída");
-  const quem=x.criadoPor&&S.names[x.criadoPor];
+  const quem=x.criadoPor&&(S.names[x.criadoPor]||x.criadoPorNome);
   if(quem)meta.push("registado por "+h(quem));
-  if(x.anulado){const q=x.anuladoPor&&S.names[x.anuladoPor];chip+=`<span class="chip bad">anulado${q?" por "+h(q):""}</span>`}
+  if(x.anulado){const q=x.anuladoPor&&(S.names[x.anuladoPor]||x.anuladoPorNome);chip+=`<span class="chip bad">anulado${q?" por "+h(q):""}</span>`}
   const entrada=x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido==="entrada");
   let acts="";
   const c=S.confirm;
@@ -659,7 +662,7 @@ function cardEu(m,vis){
     <div class="eu-links"><button class="linkbtn" data-act="tab" data-t="rendas">Ver a renda de todos</button><button class="linkbtn" data-act="eu-mudar">Não és ${h(primeiro)}?</button></div></div>`;
 }
 function escolherEu(id){
-  S.eu=id||null;
+  S.eu=id||null;S.reset="f-c-quem";
   try{if(id)localStorage.setItem("caixa-eu",id);else localStorage.removeItem("caixa-eu")}catch(e){}
   render();
 }
@@ -986,7 +989,8 @@ function tesoureirosCard(){
     <div class="membros">${ativos.map(linha).join("")||'<div class="empty">Ainda não há tesoureiros. Quem entrar primeiro fica logo tesoureiro.</div>'}</div>
     ${tes&&bloq.length?`<h3 class="sub-h">Retirados (${bloq.length})</h3><div class="membros">${bloq.map(linha).join("")}</div>`:""}
     ${!S.me?'<div class="form-foot"><button class="btn" data-act="entrar">Entrar como tesoureiro</button></div>':""}
-    ${tes?'<div class="form-foot"><a class="btn small" href="/api/copia-seguranca">Descarregar cópia de segurança</a><span class="hint">Tem todos os registos; as fotos dos talões estão na pasta <code>dados/fotos</code> do servidor.</span></div>':""}</div>`;
+    ${tes?'<div class="form-foot"><a class="btn small" href="/api/copia-seguranca">Descarregar cópia de segurança</a><span class="hint">Tem todos os registos; as fotos dos talões estão na pasta <code>dados/fotos</code> do servidor.</span></div>':""}
+    ${tes&&!S.moradores.length&&!allMovs().length?'<div class="form-foot"><button class="btn small" data-act="importar">Importar dados (.json)</button><span class="hint">Para trazer os dados de outra Caixa da Casa (por exemplo, da versão que estava no Claude). Só funciona com a app ainda vazia.</span></div>':""}</div>`;
 }
 
 function pedirNomes(){}
@@ -1153,6 +1157,7 @@ document.addEventListener("click",async e=>{
   if(a==="entrar"){S.vista="entrar";S.fresh=true;render();window.scrollTo({top:0});return}
   if(a==="entrar-voltar"){S.vista=null;S.fresh=true;return render()}
   if(a==="eu-mudar")return escolherEu(null);
+  if(a==="importar"){document.getElementById("importar-ficheiro").click();return}
   if(a==="morador-editar"){S.editMorador=id;S.reset="f-e-";return render()}
   if(a==="morador-fechar"){S.editMorador=null;return render()}
   if(a==="apagar-morador"||a==="tes-recusar"||a==="tes-retirar"){S.confirm={act:a,id};return render()}
@@ -1218,6 +1223,13 @@ anexo.addEventListener("change",async()=>{
   const l=S.fotos[alvo];if(!l)return;
   bons.slice(0,4-l.length).forEach(f=>l.push({file:f,url:URL.createObjectURL(f),pdf:f.type==="application/pdf"}));
   schedule();
+});
+
+document.getElementById("importar-ficheiro").addEventListener("change",async e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  let dados;try{dados=JSON.parse(await f.text())}catch(err){return toast("err","Esse ficheiro não é um .json válido.")}
+  let r;
+  if(await gravar(async()=>{r=await api("POST","/api/importar",dados)}))toast("ok",`Importado: ${r.pessoas} pessoas, ${r.movimentos} registos${r.fotos?", "+r.fotos+" fotos":""}.`);
 });
 
 /* ---------- export ---------- */

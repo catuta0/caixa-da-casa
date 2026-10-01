@@ -206,6 +206,10 @@ Como tesoureiro:
 
 **Alguém saiu da casa?** Em **Pessoas da casa**, edita a pessoa e põe o mês em **«Saiu no fim de»**. Não a apagues nem mudes o tipo, para as contas dos meses passados não mudarem.
 
+### Trazer dados de outra Caixa da Casa
+
+Se já tens os dados noutro sítio (por exemplo na versão que funcionava dentro do Claude), num ficheiro `.json` de exportação: entra como tesoureiro, vai a **Definições → Tesoureiros** e carrega em **Importar dados (.json)**. Traz as pessoas da casa, todos os registos, as fotos e as definições (plafond, fundo, rendas, calculadora). Só funciona com a app ainda vazia, para não duplicar nada.
+
 ## Como funcionam as contas
 
 - **Plafond**: soma das compras do mês comparada com o plafond. A linha fina na barra mostra onde devíamos ir no dia de hoje.

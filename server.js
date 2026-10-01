@@ -323,7 +323,8 @@ app.use((_req, res, next) => {
   });
   next();
 });
-app.use(express.json({ limit: "2mb" }));
+const jsonNormal = express.json({ limit: "2mb" });
+app.use((req, res, next) => (req.path === "/api/importar" ? next() : jsonNormal(req, res, next)));
 app.use(identificar);
 
 const loopback = req => {
@@ -510,6 +511,70 @@ app.get("/api/fotos/:id", (req, res) => {
   if (!r) return res.status(404).end();
   res.set({ "Content-Type": r.mime, "Cache-Control": "private, max-age=31536000, immutable", "Content-Disposition": "inline" });
   res.sendFile(path.join(DATA_DIR, "fotos", r.ficheiro));
+});
+
+// Importar dados de outra Caixa da Casa (ou da versão antiga no Claude): só numa app ainda vazia.
+const reId = /^[A-Za-z0-9_-]{1,64}$/;
+app.post("/api/importar", soTesoureiro, express.json({ limit: "80mb" }), (req, res) => {
+  const b = req.body || {};
+  if (b.formato !== "caixa-da-casa") falha(400, "Este ficheiro não é uma exportação da Caixa da Casa.");
+  const ja = db.prepare("SELECT (SELECT COUNT(*) FROM pessoas) + (SELECT COUNT(*) FROM movimentos) AS n").get().n;
+  if (ja > 0) falha(409, "A app já tem pessoas ou registos. Só dá para importar numa app vazia.");
+  const config = mudancasConfig(b.config || {});
+  const pessoas = (Array.isArray(b.pessoas) ? b.pessoas : []).map(p => {
+    if (!p || !reId.test(p.id || "")) falha(400, "Pessoa com id inválido no ficheiro.");
+    return Object.assign({ id: p.id }, dadosPessoa(Object.assign({}, p, { tipo: TIPOS_PESSOA.includes(p.tipo) ? p.tipo : "morador" }), false));
+  });
+  const idsPessoas = new Set(pessoas.map(p => p.id));
+  const mapaFotos = {}, fotosNovas = [];
+  for (const f of Array.isArray(b.fotos) ? b.fotos : []) {
+    const buf = Buffer.from(String((f && f.base64) || ""), "base64"), t = tipoFicheiro(buf);
+    if (!t) continue;
+    const id = crypto.randomBytes(16).toString("hex");
+    fotosNovas.push({ id, t, buf });
+    mapaFotos[f.id] = { id, pdf: t[0] === "application/pdf" };
+  }
+  const movimentos = (Array.isArray(b.movimentos) ? b.movimentos : []).map(m => {
+    if (!m || !["compra", "conta", "renda", "fundo"].includes(m.tipo)) falha(400, "Registo com tipo inválido no ficheiro.");
+    if (!Number.isInteger(m.cent) || m.cent <= 0 || m.cent > 1e9) falha(400, "Registo com valor inválido no ficheiro.");
+    if (!reMes.test(m.mes || "") || !reData.test(m.data || "")) falha(400, "Registo com data inválida no ficheiro.");
+    const o = { tipo: m.tipo, mes: m.mes, data: m.data, cent: m.cent, descricao: txt(m.descricao, 200) };
+    if (m.tipo === "compra" || m.tipo === "conta") {
+      o.pagoPor = m.pagoPor === "bolso" ? "bolso" : "fundo";
+      o.reembolsado = !!m.reembolsado;
+      if (o.reembolsado) o.reembolsadoEm = txt(m.reembolsadoEm, 40);
+    }
+    if (m.tipo === "conta") o.categoria = txt(m.categoria, 60) || "Outra";
+    if (m.tipo === "fundo") o.sentido = m.sentido === "saida" ? "saida" : "entrada";
+    o.morador = idsPessoas.has(m.morador) ? m.morador : "";
+    o.moradorNome = txt(m.moradorNome, 80);
+    o.fotos = (Array.isArray(m.fotos) ? m.fotos : []).map(f => mapaFotos[f && f.id]).filter(Boolean);
+    o.criadoPor = txt(m.criadoPor, 80);
+    o.criadoPorNome = txt(m.criadoPorNome, 80);
+    o.criadoEm = txt(m.criadoEm, 40) || agora();
+    o.anulado = !!m.anulado;
+    if (o.anulado) Object.assign(o, { anuladoPor: txt(m.anuladoPor, 80), anuladoPorNome: txt(m.anuladoPorNome, 80), anuladoEm: txt(m.anuladoEm, 40) });
+    return { id: reId.test(m.id || "") ? m.id : novoId(), o };
+  });
+  db.exec("BEGIN");
+  try {
+    const insP = db.prepare("INSERT INTO pessoas (id, nome, tipo, valor_fixo, entrada, saida, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    for (const p of pessoas) insP.run(p.id, p.nome, p.tipo, p.valor_fixo, p.entrada, p.saida, agora());
+    const insM = db.prepare("INSERT INTO movimentos (id, mes, criado_em, dados) VALUES (?, ?, ?, ?)");
+    for (const { id, o } of movimentos) insM.run(id, o.mes, o.criadoEm, JSON.stringify(o));
+    const insF = db.prepare("INSERT INTO fotos (id, mime, ficheiro, criado_por, criado_em) VALUES (?, ?, ?, ?, ?)");
+    for (const f of fotosNovas) {
+      fs.writeFileSync(path.join(DATA_DIR, "fotos", `${f.id}.${f.t[1]}`), f.buf);
+      insF.run(f.id, f.t[0], `${f.id}.${f.t[1]}`, req.autor, agora());
+    }
+    gravarConfig(Object.assign(lerConfig() || {}, config));
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  avisar();
+  res.json({ pessoas: pessoas.length, movimentos: movimentos.length, fotos: fotosNovas.length });
 });
 
 // Cópia de segurança da base de dados (não inclui as fotos; essas estão em DATA_DIR/fotos).
