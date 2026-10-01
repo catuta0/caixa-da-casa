@@ -284,6 +284,15 @@ td.c,th.c{text-align:center}
 .sub-h{font-size:14px;color:var(--muted);margin:16px 0 0;font-family:var(--f-body);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
 code{font-family:var(--f-mono);font-size:.92em}
 a.btn{text-decoration:none;color:inherit;display:inline-block}
+.big.med{font-size:clamp(28px,5.5vw,36px)}
+.semanas{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:12px}
+.semana{position:relative;display:grid;gap:1px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface2)}
+.semana.atual{border-color:var(--accent);background:var(--accent-soft)}
+.semana span{font-size:12.5px;color:var(--muted)}
+.semana b{font-family:var(--f-display);font-size:17px;font-weight:600}
+.semana small{font-size:12px;color:var(--muted)}
+.ponto{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%}
+.ponto.good{background:var(--good)}.ponto.warn{background:var(--warn)}.ponto.bad{background:var(--bad)}
 .breakdown{display:grid;gap:6px;margin-top:6px}
 .breakdown div{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.bar .fill{transition:width .4s ease}}
@@ -638,7 +647,36 @@ function tResumo(){
     <button class="num-item" data-act="tab" data-t="rendas"><span>Rendas por receber</span><b>${eur(st.ativos.reduce((t,r)=>t+rendaDe(r,m,vis).falta,0))}</b><small>já recebidos ${eur(st.rendasRec)}</small></button>
     <button class="num-item" data-act="tab" data-t="fundo"><span>Fundo de maneio</span><b${st.saldo<0?' style="color:var(--bad)"':""}>${eur(st.saldo)}</b></button></div></div>`;
 
-  return cardEu(m,vis)+setup+hero+formAberto+registos+numeros;
+  return cardEu(m,vis)+setup+hero+formAberto+cardSemana(m,vis)+registos+numeros;
+}
+
+/* plafond por semana (segunda a domingo): cada dia vale plafond do mês ÷ dias do mês */
+const isoDia=dt=>dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate());
+function addDias(d,n){const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return isoDia(dt)}
+function segundaDe(d){const dt=new Date(d+"T12:00:00");return addDias(d,-((dt.getDay()+6)%7))}
+function semanaDe(ini,vis){
+  const fim=addDias(ini,6);let orc=0;
+  for(let i=0;i<7;i++){const m=addDias(ini,i).slice(0,7);orc+=plafondDe(m)/diasNoMes(m)}
+  return {ini,fim,orc:Math.round(orc),gasto:sum(vis.filter(x=>x.tipo==="compra"&&x.data>=ini&&x.data<=fim))};
+}
+const intervalo=(a,b)=>a.slice(5,7)===b.slice(5,7)?`${+a.slice(8,10)}–${dataCurta(b)}`:`${dataCurta(a)} – ${dataCurta(b)}`;
+function estadoSemana(s){const p=s.orc?s.gasto/s.orc:0;return p>1?"bad":p>.85?"warn":"good"}
+function cardSemana(m,vis){
+  if(!plafondDe(m))return "";
+  const hojeD=hoje(),atual=m===hojeMes();
+  const semanas=[];for(let ini=segundaDe(m+"-01");ini<=m+"-"+pad(diasNoMes(m));ini=addDias(ini,7))semanas.push(semanaDe(ini,vis));
+  const lista=`<div class="semanas">${semanas.map(s=>{
+    const esta=s.ini<=hojeD&&hojeD<=s.fim,futura=s.ini>hojeD,cls=futura?"neutral":estadoSemana(s);
+    return `<div class="semana${esta?" atual":""}"><span>${esta?"Esta semana":intervalo(s.ini,s.fim)}</span><b class="num">${eur(s.gasto)}</b><small class="${futura?"muted":""}">de ${eur(s.orc)}</small>${futura?"":`<i class="ponto ${cls}" aria-hidden="true"></i>`}</div>`}).join("")}</div>`;
+  if(!atual)return `<div class="card"><div class="eyebrow">Plafond por semana · ${nomeMes(m)}</div>${lista}</div>`;
+  const s=semanaDe(segundaDe(hojeD),vis),resta=s.orc-s.gasto,pct=s.orc?s.gasto/s.orc:0;
+  const diaSem=(new Date(hojeD+"T12:00:00").getDay()+6)%7+1,faltam=7-diaSem+1;
+  return `<div class="card hero">
+    <div class="eyebrow">Plafond da semana · ${intervalo(s.ini,s.fim)}</div>
+    <div class="big med${resta<0?" over":""}">${eur(Math.abs(resta))}<small>${resta>=0?"ainda por gastar esta semana":"acima do plafond da semana"}</small></div>
+    <div class="bar" role="img" aria-label="Gasto ${Math.round(pct*100)}% do plafond da semana"><div class="fill ${estadoSemana(s)==="good"?"":estadoSemana(s)}" style="width:${Math.min(100,pct*100).toFixed(1)}%"></div><div class="pace" style="left:calc(${(diaSem/7*100).toFixed(1)}% - 1px)" title="A linha fina marca onde devíamos ir hoje"></div></div>
+    <div class="bar-legend"><span>Gasto <b>${eur(s.gasto)}</b> de ${eur(s.orc)}</span>${resta>0?`<span>cerca de <b>${eur(Math.floor(resta/faltam))}</b> por dia até domingo</span>`:""}</div>
+    ${lista}</div>`;
 }
 
 /* "a minha renda": cada aparelho escolhe uma vez quem é (fica guardado neste aparelho) */

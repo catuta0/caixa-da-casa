@@ -3,6 +3,7 @@
 Livro de caixa para casas comunitárias e associações. Toda a gente vê as contas da casa e regista o que compra; o tesoureiro gere as rendas, as contas e o fundo de maneio.
 
 - **Plafond de compras**: quanto já se gastou em comida e coisas para a casa, quanto falta e quanto dá por dia até ao fim do mês.
+- **Plafond por semana**: o plafond do mês repartido por semanas (segunda a domingo), com quanto falta esta semana e como correu cada semana.
 - **Rendas**: a renda do mês é dividida por moradores, comensais e meios comensais. Cada pessoa vê logo quanto tem de pagar, quanto já pagou e o que vem de meses anteriores.
 - **Calculadora da renda**: prevês cada despesa (renda ao senhorio, água, luz, gás, internet, comida…) e a app soma e divide. Podes escolher que despesas os comensais pagam, dar valores fixos e acertar à mão a parte de alguém.
 - **Compras pagas do próprio bolso**: são descontadas logo na renda de quem pagou (ou pagas em dinheiro pelo tesoureiro, se a pessoa precisar).
@@ -213,6 +214,7 @@ Se já tens os dados noutro sítio (por exemplo na versão que funcionava dentro
 ## Como funcionam as contas
 
 - **Plafond**: soma das compras do mês comparada com o plafond. A linha fina na barra mostra onde devíamos ir no dia de hoje.
+- **Plafond da semana**: cada dia vale o plafond do mês a dividir pelos dias do mês; uma semana (segunda a domingo) soma os seus 7 dias, mesmo que apanhe dois meses. Conta as compras com data nessa semana.
 - **Renda de cada pessoa** = parte do mês + o que ficou por pagar antes − o que pagou a mais antes − compras pagas do seu bolso nesse mês. Pode ficar negativa: nesse caso a casa deve à pessoa e a diferença passa para o mês seguinte.
 - **Divisão**: as despesas marcadas para comensais dividem-se por moradores, comensais (peso 1) e meios comensais (peso ½); o resto só pelos moradores. Os valores fixos saem primeiro. Os cêntimos que sobram vão para as primeiras pessoas por ordem alfabética.
 - **Acerto à mão**: o tesoureiro pode mudar a parte de uma pessoa num mês; os outros não mudam e a renda total desse mês acompanha.
