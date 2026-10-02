@@ -282,7 +282,7 @@ function dadosPessoa(b, parcial) {
 const CHAVES_CONFIG = {
   nome: "string", plafond: "int", fundoInicial: "int", rendasNoFundo: "bool", arredondarRenda: "bool", anoInicio: "intnull",
   plafondMes: "obj", rendaMes: "obj", previsaoMes: "obj", divisaoMes: "obj", ajustesMes: "obj",
-  despesas: "arr", comensalLinhas: "arr",
+  despesas: "arr", comensalLinhas: "arr", receitas: "arr",
 };
 function mudancasConfig(b) {
   const out = {};

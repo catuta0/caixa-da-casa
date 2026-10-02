@@ -6,6 +6,7 @@ Livro de caixa para casas comunitárias e associações. Toda a gente vê as con
 - **Plafond por semana**: o plafond do mês repartido por semanas (de sexta a quinta), com quanto falta esta semana e como correu cada semana.
 - **Rendas**: a renda do mês é dividida por moradores, comensais e meios comensais. Cada pessoa vê logo quanto tem de pagar, quanto já pagou e o que vem de meses anteriores.
 - **Calculadora da renda**: prevês cada despesa (renda ao senhorio, água, luz, gás, internet, comida…) e a app soma e divide. Podes escolher que despesas os comensais pagam, dar valores fixos e acertar à mão a parte de alguém.
+- **Simulação da renda**: experimenta valores sem gravar nada. Com «ajustar automaticamente», mudar o valor de uma pessoa faz os outros acompanharem sem mudar o total; sem isso, vês a diferença para os gastos previstos. Junta receitas mensais ou anuais (quotas, alugueres, subsídios) que abatem na renda. O tesoureiro pode aplicar o resultado ao mês.
 - **Compras pagas do próprio bolso**: são descontadas logo na renda de quem pagou (ou pagas em dinheiro pelo tesoureiro, se a pessoa precisar).
 - **Fotos dos talões** em cada compra ou conta.
 - **Fundo de maneio**: livro de caixa com entradas, saídas e saldo, mês a mês.

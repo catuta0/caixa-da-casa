@@ -293,6 +293,24 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}
 .semana small{font-size:12px;color:var(--muted)}
 .ponto{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%}
 .ponto.good{background:var(--good)}.ponto.warn{background:var(--warn)}.ponto.bad{background:var(--bad)}
+.sim-opcoes{display:grid;gap:8px}
+.sim-recs{display:grid;gap:8px;margin-top:8px}
+.sim-rec{display:grid;grid-template-columns:minmax(0,1fr) 110px 130px 28px;gap:6px;align-items:center}
+.sim-rec input,.sim-rec select,.sim-val{height:38px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--ink);font-size:14px;min-width:0}
+.sim-rec input.num,.sim-val{text-align:right;font-family:var(--f-mono)}
+@media (max-width:560px){.sim-rec{grid-template-columns:minmax(0,1fr) 100px 28px}.sim-rec select{grid-column:1/3}}
+.sim-linhas{display:grid;gap:6px;margin-top:8px}
+.sim-linha{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--rule);border-radius:10px}
+.sim-linha.mexido{border-color:var(--warn);background:var(--warn-soft)}
+.sim-nome{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sim-valor{display:flex;align-items:center;gap:10px}
+.sim-valor .sim-normal{font-size:12.5px}
+.sim-val{width:110px}
+.sim-contas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--accent-soft)}
+@media (max-width:640px){.sim-contas{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sim-contas span{display:block;font-size:12.5px;color:var(--muted)}
+.sim-contas b{font-family:var(--f-display);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.sim-estado{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:10px;font-size:14px}
 .breakdown{display:grid;gap:6px;margin-top:6px}
 .breakdown div{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.bar .fill{transition:width .4s ease}}
@@ -887,6 +905,121 @@ function atualizarPrev(){
 const _prev=e=>{const c=e.target.classList;if(c&&(c.contains("prev-in")||c.contains("prev-com")||c.contains("prev-arred")))atualizarPrev()};
 document.addEventListener("input",_prev);document.addEventListener("change",_prev);
 
+/* ---------- simulação da renda (não grava nada até o tesoureiro aplicar) ---------- */
+function somaPrev(v){return Object.values(v||{}).reduce((t,c)=>t+(+c||0),0)}
+const gastosPrevistos=m=>rendaTotal(m)!=null?rendaTotal(m):somaPrev(previsaoBase(m,vivos()).v);
+const receitaMensal=r=>{const c=+r.valor||0;return r.periodo==="anual"?Math.round(c/12):c};
+const receitasTotal=rs=>rs.reduce((t,r)=>t+receitaMensal(r),0);
+function iniciarSim(m){
+  S.sim={mes:m,auto:true,arred:regraDe(m).arredondar,G:gastosPrevistos(m),
+    receitas:(S.config.receitas||[]).map(r=>({nome:r.nome||"",valor:+r.valor||0,periodo:r.periodo==="anual"?"anual":"mensal"})),
+    fix:{},val:null,base:{},T:0};
+  recalcSim(true);
+}
+function pessoasSim(m){return S.moradores.filter(r=>ativoEm(r,m)).sort((a,b)=>a.nome.localeCompare(b.nome,"pt"))}
+/* recalcula a base (regra automática para o total a cobrar) e, se pedido, redistribui */
+function recalcSim(repor){
+  const s=S.sim,m=s.mes;
+  s.T=Math.max(0,s.G-receitasTotal(s.receitas));
+  const regra=Object.assign(regraDe(m),{ajustes:{},arredondar:s.arred});
+  s.base=s.T?divisao(s.T,previsaoBase(m,vivos()).v,m,regra).out:{};
+  if(repor||!s.val){s.val=Object.assign({},s.base);s.fix={}}
+  else if(s.auto)redistribuir();
+}
+/* com "ajustar automaticamente": quem não foi mexido divide o que falta, na proporção da sua parte normal */
+function redistribuir(){
+  const s=S.sim,ids=pessoasSim(s.mes).map(r=>r.id);
+  const fixos=ids.filter(id=>s.fix[id]),livres=ids.filter(id=>!s.fix[id]);
+  const resto=s.T-fixos.reduce((t,id)=>t+(s.val[id]||0),0);
+  livres.forEach(id=>{s.val[id]=0});
+  if(resto>0&&livres.length){
+    const tmp={},soma=livres.reduce((t,id)=>t+(s.base[id]||0),0);
+    dividirPeso(resto,livres.map(id=>({id,w:soma?(s.base[id]||0):1})),tmp);
+    livres.forEach(id=>{s.val[id]=s.arred?Math.ceil(((tmp[id]||0)-1e-6)/100)*100:(tmp[id]||0)});
+  }
+}
+function resumoSim(){
+  const s=S.sim,ids=pessoasSim(s.mes).map(r=>r.id),total=ids.reduce((t,id)=>t+(s.val[id]||0),0),R=receitasTotal(s.receitas),dif=total-s.T;
+  const livres=ids.filter(id=>!s.fix[id]).length;
+  let estado;
+  if(dif===0)estado=`<span class="chip good">Bate certo com os gastos previstos</span>`;
+  else if(dif>0)estado=`<span class="chip ${s.auto&&s.arred?"good":"warn"}">Sobram ${eur(dif)}${s.auto&&s.arred?" do arredondamento (ficam no fundo)":""}</span>`;
+  else estado=`<span class="chip bad">Faltam ${eur(-dif)} para cobrir os gastos previstos</span>`;
+  const aviso=s.auto&&!livres?'<div class="hint">Mudaste o valor de toda a gente: já não há ninguém para ajustar. Carrega em «Repor» para recomeçar.</div>':"";
+  return `<div class="sim-contas">
+      <div><span>Gastos previstos</span><b>${eur(s.G)}</b></div>
+      <div><span>Receitas a abater</span><b style="color:var(--good)">${R?"−"+eur(R):eur(0)}</b></div>
+      <div><span>A cobrar às pessoas</span><b>${eur(s.T)}</b></div>
+      <div><span>Total da simulação</span><b>${eur(total)}</b></div></div>
+    <div class="sim-estado">${estado}${dif!==0?` <span class="muted">Diferença: ${dif>0?"+":"−"}${eur(Math.abs(dif))}</span>`:""}</div>${aviso}`;
+}
+function cardSimulacao(m){
+  if(!S.sim||S.sim.mes!==m)iniciarSim(m);
+  const s=S.sim,ps=pessoasSim(m);
+  if(!s.G)return `<div class="card"><h2>Simulação da renda</h2><div class="hint">Para simular, define primeiro a previsão ou a renda total de ${nomeMes(m).toLowerCase()} na calculadora.</div></div>`;
+  const linhas=ps.map(r=>{
+    const mexido=!!s.fix[r.id],mudou=(s.val[r.id]||0)!==(s.base[r.id]||0);
+    return `<div class="sim-linha${mexido?" mexido":""}"><div class="sim-nome"><b>${h(r.nome)}</b>${eComensal(r)?` <span class="chip neutral">${nomeTipo(r)}</span>`:""}${mexido?' <span class="chip warn">mudado por ti</span>':mudou?' <span class="chip neutral">ajustado</span>':""}</div>
+      <div class="sim-valor"><span class="muted sim-normal">normal ${eur(s.base[r.id]||0)}</span><input class="sim-val" id="sim-v-${h(r.id)}" data-id="${h(r.id)}" inputmode="decimal" value="${eurNum(s.val[r.id]||0)}" aria-label="Valor de ${h(r.nome)}"></div></div>`;
+  }).join("");
+  const receitas=s.receitas.map((r,i)=>`<div class="sim-rec">
+      <input class="sim-r" id="sim-r-${i}-nome" data-i="${i}" data-c="nome" maxlength="60" placeholder="Ex.: quota da associação, aluguer da sala" value="${h(r.nome)}" aria-label="Nome da receita">
+      <input class="sim-r num" id="sim-r-${i}-valor" data-i="${i}" data-c="valor" inputmode="decimal" placeholder="0,00" value="${r.valor?eurNum(r.valor):""}" aria-label="Valor da receita">
+      <select class="sim-r" id="sim-r-${i}-periodo" data-i="${i}" data-c="periodo" aria-label="Período"><option value="mensal"${r.periodo==="mensal"?" selected":""}>por mês</option><option value="anual"${r.periodo==="anual"?" selected":""}>por ano (÷12)</option></select>
+      <button type="button" class="rm" data-act="sim-rec-rm" data-i="${i}" aria-label="Tirar esta receita">×</button></div>`).join("");
+  return `<div class="card" id="simulacao"><div class="section-head"><h2>Simulação da renda · ${nomeMes(m)}</h2><button class="btn small" data-act="sim-repor">Repor</button></div>
+    <div class="hint" style="margin-bottom:10px">Experimenta valores à vontade: nada fica gravado${gere()?" até carregares em «Aplicar»":""}.</div>
+    <div class="sim-opcoes">
+      <label class="check"><input type="checkbox" id="sim-auto"${s.auto?" checked":""}><span><b>Ajustar os outros automaticamente</b>: quando mudas o valor de alguém, os outros acompanham e o total não muda. Desligado, só muda essa pessoa e vês a diferença para os gastos previstos.</span></label>
+      <label class="check"><input type="checkbox" id="sim-arred"${s.arred?" checked":""}><span>Arredondar para cima (euros certos)</span></label>
+    </div>
+    <h3 class="sub-h">Receitas a abater</h3>
+    <div class="hint">Dinheiro que entra na casa e baixa a renda (quotas, alugueres, subsídios…). As anuais contam 1/12 por mês. Abatem na parte que só os moradores pagam.</div>
+    <div class="sim-recs">${receitas||""}</div>
+    <button type="button" class="btn small" data-act="sim-rec-add" style="margin-top:8px">+ Receita</button>
+    <h3 class="sub-h">Quanto paga cada pessoa</h3>
+    <div class="sim-linhas">${linhas}</div>
+    <div id="sim-resumo">${resumoSim()}</div>
+    ${gere()?`<div class="form-foot"><button class="btn primary" data-act="sim-aplicar"${S.saving?" disabled":""}>Aplicar a ${nomeMes(m).toLowerCase()}</button><span class="hint">Grava estes valores como a parte de cada pessoa neste mês (aparecem como «acertado») e guarda as receitas para as próximas simulações.</span></div>`:""}
+  </div>`;
+}
+/* atualiza os números no ecrã sem redesenhar (para não perder o que se está a escrever) */
+function atualizarSimDOM(exceto){
+  const s=S.sim;if(!s)return;
+  document.querySelectorAll(".sim-val").forEach(el=>{if(el.id!==exceto)el.value=eurNum(s.val[el.dataset.id]||0)});
+  document.querySelectorAll(".sim-normal").forEach((el,i)=>{const inp=el.parentElement.querySelector(".sim-val");if(inp)el.textContent="normal "+eur(s.base[inp.dataset.id]||0)});
+  const r=document.getElementById("sim-resumo");if(r)r.innerHTML=resumoSim();
+}
+document.addEventListener("change",e=>{
+  const t=e.target;if(!S.sim)return;
+  if(t.classList&&t.classList.contains("sim-val")){
+    const x=t.value.trim(),c=x===""||x==="0"||x==="0,00"?0:parseValor(x);
+    if(c==null){toast("err","Escreve um valor, por exemplo 180");t.value=eurNum(S.sim.val[t.dataset.id]||0);return}
+    S.sim.val[t.dataset.id]=c;
+    if(S.sim.auto){S.sim.fix[t.dataset.id]=true;redistribuir()}
+    else S.sim.fix[t.dataset.id]=true;
+    render();
+  }
+  if(t.id==="sim-auto"){S.sim.auto=t.checked;if(t.checked)redistribuir();render()}
+  if(t.id==="sim-arred"){S.sim.arred=t.checked;recalcSim(!Object.keys(S.sim.fix).length);render()}
+});
+document.addEventListener("input",e=>{
+  const t=e.target;if(!S.sim||!t.classList||!t.classList.contains("sim-r"))return;
+  const r=S.sim.receitas[+t.dataset.i];if(!r)return;
+  if(t.dataset.c==="valor"){const x=t.value.trim();r.valor=x?(parseValor(x)||0):0}else r[t.dataset.c]=t.value;
+  recalcSim(false);
+  atualizarSimDOM(null);
+});
+document.addEventListener("change",e=>{if(e.target.classList&&e.target.classList.contains("sim-r")&&e.target.tagName==="SELECT"){const r=S.sim.receitas[+e.target.dataset.i];if(r){r.periodo=e.target.value;recalcSim(false);atualizarSimDOM(null)}}});
+async function aplicarSim(){
+  const s=S.sim,m=s.mes,aj=JSON.parse(JSON.stringify(S.config.ajustesMes||{}));
+  aj[m]={};pessoasSim(m).forEach(r=>{aj[m][r.id]=s.val[r.id]||0});
+  const receitas=s.receitas.filter(r=>r.nome.trim()||r.valor).map(r=>({nome:r.nome.trim().slice(0,60),valor:r.valor,periodo:r.periodo}));
+  const p={ajustesMes:aj,receitas};
+  if(rendaTotal(m)==null){const rm=Object.assign({},S.config.rendaMes||{});rm[m]=s.G;p.rendaMes=rm}
+  if(await gravar(()=>guardarConfig(p))){S.sim=null;toast("ok","Simulação aplicada a "+nomeMes(m).toLowerCase())}
+}
+
 function tRendas(){
   const m=S.mes,vis=vivos(),total=rendaTotal(m),ant=rendaTotal(addMes(m,-1));
   const ativos=S.moradores.filter(r=>ativoEm(r,m));
@@ -932,7 +1065,7 @@ function tRendas(){
   const calc=gere()?cardPrevisao(m,vis):`<details class="card detalhes" id="det-prev"${S.detAberto?" open":""}><summary>Ver como se chegou ao valor da renda</summary>${cardPrevisao(m,vis)}</details>`;
   return `<div class="card"><div class="section-head"><h2>Quanto paga cada pessoa · ${nomeMes(m)}</h2><span class="hint">${S.config.rendasNoFundo?"O que se paga entra no fundo de maneio.":"O que se paga não entra no fundo de maneio."}</span></div>${tabela}</div>
     <div class="card"><h2 style="margin-bottom:6px">Pagamentos em ${nomeMes(m).toLowerCase()}</h2>${lista(pagos,"Ainda nenhum pagamento de renda neste mês.")}</div>
-    <h2 class="sub-sec">Tesouraria${gere()?"":' <span class="hint" style="font-family:var(--f-body);font-weight:400">· só o tesoureiro altera</span>'}</h2>`+topo+calc;
+    <h2 class="sub-sec">Tesouraria${gere()?"":' <span class="hint" style="font-family:var(--f-body);font-weight:400">· só o tesoureiro altera</span>'}</h2>`+topo+calc+cardSimulacao(m);
 }
 
 function tFundo(){
@@ -1202,7 +1335,7 @@ async function addDespesa(){
 }
 /* ---------- clicks ---------- */
 function ir(tab){S.tab=tab;S.confirm=null;S.rendaEdit=null;S.editMorador=null;S.vista=null;S.resumoForm=null;S.verFoto=null;S.fresh=true;render();window.scrollTo({top:0})}
-function mudarMes(m){S.mes=m;S.confirm=null;S.rendaEdit=null;S.ajusteEdit=null;S.fresh=true;render()}
+function mudarMes(m){S.mes=m;S.sim=null;S.confirm=null;S.rendaEdit=null;S.ajusteEdit=null;S.fresh=true;render()}
 document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;
   const a=b.dataset.act,id=b.dataset.id;
@@ -1215,6 +1348,10 @@ document.addEventListener("click",async e=>{
   if(a==="entrar"){S.vista="entrar";S.fresh=true;render();window.scrollTo({top:0});return}
   if(a==="entrar-voltar"){S.vista=null;S.fresh=true;return render()}
   if(a==="eu-mudar")return escolherEu(null);
+  if(a==="sim-repor"){iniciarSim(S.mes);return render()}
+  if(a==="sim-rec-add"){S.sim.receitas.push({nome:"",valor:0,periodo:"mensal"});render();const el=document.getElementById("sim-r-"+(S.sim.receitas.length-1)+"-nome");if(el)el.focus();return}
+  if(a==="sim-rec-rm"){S.sim.receitas.splice(+b.dataset.i,1);recalcSim(false);return render()}
+  if(a==="sim-aplicar"){if(!gere())return semPermissao();return aplicarSim()}
   if(a==="arred-mes"){
     const m=S.mes,novo=!regraDe(m).arredondar,dm=JSON.parse(JSON.stringify(S.config.divisaoMes||{}));
     const r=regraDe(m);delete r.ajustes;dm[m]=Object.assign(r,{arredondar:novo});
