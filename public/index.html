@@ -676,7 +676,7 @@ function tResumo(){
 
   const numeros=`<div class="card numeros"><div class="eyebrow">${nomeMes(m)} em números</div><div class="nums">
     <button class="num-item" data-act="filtro" data-f="conta"><span>Contas da casa</span><b>${eur(st.contas)}</b></button>
-    <button class="num-item" data-act="tab" data-t="rendas"><span>Rendas por receber</span><b>${eur(st.ativos.reduce((t,r)=>t+rendaDe(r,m,vis).falta,0))}</b><small>já recebidos ${eur(st.rendasRec)}</small></button>
+    <button class="num-item" data-act="tab" data-t="rendas"><span>Rendas por receber</span><b>${eur(totaisRenda(m,vis).falta)}</b><small>${totaisRenda(m,vis).antes>0?"inclui "+eur(totaisRenda(m,vis).antes)+" de meses anteriores · ":""}já recebidos ${eur(st.rendasRec)}</small></button>
     <button class="num-item" data-act="tab" data-t="fundo"><span>Fundo de maneio</span><b${st.saldo<0?' style="color:var(--bad)"':""}>${eur(st.saldo)}</b></button></div></div>`;
 
   return cardEu(m,vis)+setup+hero+formAberto+cardSemana(m,vis)+registos+numeros;
@@ -1056,14 +1056,23 @@ async function aplicarSim(){
   if(await gravar(()=>guardarConfig(p))){S.sim=null;toast("ok","Simulação aplicada a "+nomeMes(m).toLowerCase())}
 }
 
+/* quem conta nas rendas de um mês: quem está na casa, ou quem saiu mas ainda tem contas em aberto */
+function linhasRenda(m,vis){
+  return pessoasCasa(m).filter(r=>!r.entrada||r.entrada<=m).map(r=>({r,d:rendaDe(r,m,vis)}))
+    .filter(o=>ativoEm(o.r,m)||o.d.devido!==0||o.d.pago>0).sort((a,b)=>a.r.nome.localeCompare(b.r.nome,"pt"));
+}
+function totaisRenda(m,vis){
+  const ls=linhasRenda(m,vis);
+  return {falta:ls.reduce((t,o)=>t+o.d.falta,0),antes:ls.reduce((t,o)=>t+o.d.antes,0),pago:ls.reduce((t,o)=>t+o.d.pago,0)};
+}
 function tRendas(){
   const m=S.mes,vis=vivos(),total=rendaTotal(m),ant=rendaTotal(addMes(m,-1));
   const ativos=S.moradores.filter(r=>ativoEm(r,m));
-  const linhas=pessoasCasa(m).filter(r=>!r.entrada||r.entrada<=m).map(r=>({r,d:rendaDe(r,m,vis)}))
-    .filter(o=>ativoEm(o.r,m)||o.d.devido!==0||o.d.pago>0).sort((a,b)=>a.r.nome.localeCompare(b.r.nome,"pt"));
+  const linhas=linhasRenda(m,vis),tr=totaisRenda(m,vis);
   const senhorio=vis.find(x=>x.tipo==="conta"&&x.categoria==="Renda da casa"&&x.mes===m);
-  let topo=`<div class="card"><div class="section-head"><div><div class="eyebrow">Renda da casa · ${nomeMes(m)}</div>
-    <div class="big">${total!=null?eur(rendaEfetiva(m)):'<span class="muted" style="font-size:.6em">Por definir</span>'}</div></div>
+  let topo=`<div class="card"><div class="section-head"><div><div class="eyebrow">Renda de ${nomeMes(m).toLowerCase()} (só este mês)</div>
+    <div class="big">${total!=null?eur(rendaEfetiva(m)):'<span class="muted" style="font-size:.6em">Por definir</span>'}</div>
+    ${total!=null||tr.falta?`<div class="hint">Ao todo, falta receber <b>${eur(tr.falta)}</b>${tr.antes>0?` (inclui ${eur(tr.antes)} que vem de meses anteriores)`:""}${tr.pago?`; já entraram ${eur(tr.pago)} este mês`:""}.</div>`:""}</div>
     <div>${senhorio?`<span class="chip good">Paga ao senhorio a ${dataCurta(senhorio.data)}</span>`:(total&&gere()?`<button class="btn small" data-act="senhorio">Registar pagamento ao senhorio (${eur(valorSenhorio(m))})</button>`:"")}</div></div>
     <div class="hint">${total&&rendaEfetiva(m)!==total?`Com os acertos à mão; o valor calculado era ${eur(total)}. `:""}${total?textoDivisao(divisaoDe(m)):"Põe o valor total da renda deste mês para se calcular quanto cada pessoa tem de pagar."}${!senhorio&&total&&gere()?" O pagamento ao senhorio sai do fundo de maneio.":""}</div>`;
   if(gere()&&total){
