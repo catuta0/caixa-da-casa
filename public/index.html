@@ -379,7 +379,7 @@ const nomeTipo=r=>r.tipo==="meio"?"meio comensal":r.tipo==="comensal"?"comensal"
 function regraAtual(){
   const fixos={},comensais=[],meios=[];
   S.moradores.forEach(r=>{if(eComensal(r)){comensais.push(r.id);if(eMeio(r))meios.push(r.id);if(r.valorFixo!=null)fixos[r.id]=r.valorFixo}});
-  return {linhas:(S.config.comensalLinhas||LINHAS_COM_DEF).slice(),fixos,comensais,meios,pessoas:S.moradores.map(r=>r.id)};
+  return {linhas:(S.config.comensalLinhas||LINHAS_COM_DEF).slice(),fixos,comensais,meios,pessoas:S.moradores.map(r=>r.id),arredondar:!!S.config.arredondarRenda};
 }
 const pessoaInfo=id=>S.moradores.find(x=>x.id===id)||null;
 const pessoasCasa=m=>S.moradores;
@@ -387,7 +387,7 @@ const pessoasCasa=m=>S.moradores;
 const ajustesDe=m=>(S.config.ajustesMes||{})[m]||{};
 function regraDe(m){
   const d=(S.config.divisaoMes||{})[m];
-  const r=d?{linhas:d.linhas||[],fixos:d.fixos||{},comensais:d.comensais||[],meios:d.meios||[],pessoas:d.pessoas||null}:regraAtual();
+  const r=d?{linhas:d.linhas||[],fixos:d.fixos||{},comensais:d.comensais||[],meios:d.meios||[],pessoas:d.pessoas||null,arredondar:!!d.arredondar}:regraAtual();
   r.ajustes=ajustesDe(m);return r;
 }
 function dividir(t,rs,out){dividirPeso(t,rs.map(r=>({id:r.id,w:1})),out)}
@@ -418,6 +418,17 @@ function divisao(t,v,m,regra){
     dividirPeso(P,gs,out);dividir(resto-P,mor,out);
     cadaCom=comParte.length?Math.round(P/W):0;
   }
+  /* arredondar para cima: cada pessoa do mesmo tipo paga o mesmo valor, em euros certos; o que sobra vai para o fundo */
+  const euros=c=>Math.ceil((c-1e-6)/100)*100;
+  let porPeso=0;
+  if(regra.arredondar){
+    const W=mor.length+comParte.reduce((s,r)=>s+peso(r),0);
+    porPeso=mor.length?(comParte.length&&W?P/W:0):(W?resto/W:0);
+    const cadaMorExato=mor.length?porPeso+(resto-P)/mor.length:0;
+    mor.forEach(r=>{out[r.id]=euros(cadaMorExato)});
+    comParte.forEach(r=>{out[r.id]=euros(porPeso*peso(r))});
+    cadaCom=euros(porPeso);
+  }
   /* acertos à mão: a pessoa passa a pagar esse valor e a renda total do mês ajusta-se (os outros não mudam) */
   const somaBase=todos.reduce((s,r)=>s+(out[r.id]||0),0);
   todos.forEach(r=>{if(aj[r.id]!=null){out[r.id]=aj[r.id];ajustados.push({nome:r.nome,valor:aj[r.id]})}});
@@ -426,7 +437,7 @@ function divisao(t,v,m,regra){
   const soma=todos.reduce((s,r)=>s+(out[r.id]||0),0);
   const cc=!livresMor.length&&dif&&livresCom.length?Math.round(livresCom.filter(r=>!isMeio(r)).reduce((s,r)=>s+(out[r.id]||0),0)/Math.max(1,livresCom.filter(r=>!isMeio(r)).length)):cadaCom;
   return {out,nTodos:todos.length,nMor:livresMor.length,nComParte:livresCom.filter(r=>!isMeio(r)).length,nMeio:livresCom.filter(isMeio).length,
-    fixos,ajustados,cadaCom:cc,cadaMeio:Math.round(cc/2),cadaMor,linhas:regra.linhas,soma,somaBase,total:t};
+    fixos,ajustados,cadaCom:cc,cadaMeio:regra.arredondar?euros(porPeso/2):Math.round(cc/2),cadaMor,linhas:regra.linhas,soma,somaBase,total:t,arredondar:!!regra.arredondar};
 }
 const _q={};
 function divisaoDe(m){if(m in _q)return _q[m];const t=rendaTotal(m);return _q[m]=t?divisao(t,previsaoBase(m,vivos()).v,m):null}
@@ -451,7 +462,8 @@ function textoDivisao(d){
   }
   if(d.nMor)p.push(`cada morador paga <b>${eur(d.cadaMor)}</b>`);
   let s=p.join("; ")+".";s=s.charAt(0).toUpperCase()+s.slice(1);
-  if(d.somaBase!==d.total)s+=` <span style="color:var(--bad)">Atenção: a soma das partes (${eur(d.somaBase)}) não bate com a renda calculada (${eur(d.total)}).</span>`;
+  if(d.arredondar&&d.somaBase>d.total)s+=` Arredondado para cima: sobram <b>${eur(d.somaBase-d.total)}</b>, que ficam no fundo de maneio.`;
+  else if(d.somaBase!==d.total)s+=` <span style="color:var(--bad)">Atenção: a soma das partes (${eur(d.somaBase)}) não bate com a renda calculada (${eur(d.total)}).</span>`;
   return s;
 }
 /* parte do mês na tabela das rendas; o tesoureiro pode acertar à mão */
@@ -803,7 +815,7 @@ function formConta(noResumo){
 /* ---------- tesoureiros: só eles mexem em rendas, fundo e definições; toda a gente vê e regista compras e contas ---------- */
 const gere=()=>S.canWrite&&S.tes;
 const SO_TES_FORMS=["conta","ajuste","renda","renda-total","previsao","fundo","config","morador","morador-edit"];
-const SO_TES_ACTS=["ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir","morador-editar","apagar-morador","tes-aprovar","tes-recusar","tes-retirar"];
+const SO_TES_ACTS=["arred-mes","ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir","morador-editar","apagar-morador","tes-aprovar","tes-recusar","tes-retirar"];
 const semPermissao=()=>toast("err","Só os tesoureiros podem fazer isto.");
 const eMeu=x=>S.canWrite&&!!S.autor&&x.criadoPor===S.autor;
 const podeAnular=x=>gere()||(eMeu(x)&&x.tipo==="compra");
@@ -853,6 +865,7 @@ function cardPrevisao(m,vis){
     <div class="tablewrap"><table class="prev"><thead><tr><th>O quê</th>${temCom?'<th class="c">Comensais pagam</th>':""}<th class="r">Previsto</th><th class="r">Mês passado</th><th class="r">Real este mês</th></tr></thead>
     <tbody>${rows}</tbody><tfoot><tr><td>Total</td>${temCom?"<td></td>":""}<td class="r num" id="prev-total">—</td><td></td><td class="r num">${realTot?eur(realTot):"—"}</td></tr></tfoot></table></div>
     ${add}
+    <label class="check" style="margin-top:12px"><input type="checkbox" id="f-p-arred" class="prev-arred"${regraDe(m).arredondar?" checked":""}${ro}><span>Arredondar para cima: cada pessoa paga um valor em euros certos, igual para todos do mesmo tipo (o que sobra fica no fundo)</span></label>
     <div class="prev-res"><span>Total previsto <b class="num prev-cada" id="prev-total2">—</b></span><span id="prev-div"></span></div>
     ${gere()?`<div class="form-foot">${btnGuardar("Usar como renda de "+nomeMes(m).toLowerCase())}<span class="hint">${temCom?"Marca na coluna «Comensais pagam» as despesas que os comensais dividem com os moradores (quem tem valor fixo paga só esse valor). ":""}Guarda a previsão, define a renda total do mês e, se mudaste o plafond, passa a ser o plafond de compras deste mês. As despesas novas aparecem também como tipo de conta.</span></div>`:""}
   </form>`;
@@ -862,7 +875,8 @@ function lerPrev(){
   document.querySelectorAll(".prev-in").forEach(el=>{const x=el.value.trim();if(!x||x==="0")return;const c=parseValor(x);if(c==null)mau=el.dataset.l;else{v[el.dataset.k]=c;t+=c}});
   const cs=document.querySelectorAll(".prev-com");
   const linhas=cs.length?[...cs].filter(c=>c.checked).map(c=>c.dataset.k):regraDe(S.mes).linhas;
-  return {v,t,mau,regra:Object.assign(regraAtual(),{linhas,ajustes:ajustesDe(S.mes)})};
+  const ar=document.getElementById("f-p-arred");
+  return {v,t,mau,regra:Object.assign(regraAtual(),{linhas,ajustes:ajustesDe(S.mes),arredondar:ar?ar.checked:regraDe(S.mes).arredondar})};
 }
 function atualizarPrev(){
   if(!document.querySelector(".prev-in"))return;
@@ -870,7 +884,7 @@ function atualizarPrev(){
   document.getElementById("prev-total").textContent=tt;document.getElementById("prev-total2").textContent=tt;
   document.getElementById("prev-div").innerHTML=mau||!t?"":textoDivisao(divisao(t,v,S.mes,regra));
 }
-const _prev=e=>{const c=e.target.classList;if(c&&(c.contains("prev-in")||c.contains("prev-com")))atualizarPrev()};
+const _prev=e=>{const c=e.target.classList;if(c&&(c.contains("prev-in")||c.contains("prev-com")||c.contains("prev-arred")))atualizarPrev()};
 document.addEventListener("input",_prev);document.addEventListener("change",_prev);
 
 function tRendas(){
@@ -883,6 +897,10 @@ function tRendas(){
     <div class="big">${total!=null?eur(rendaEfetiva(m)):'<span class="muted" style="font-size:.6em">Por definir</span>'}</div></div>
     <div>${senhorio?`<span class="chip good">Paga ao senhorio a ${dataCurta(senhorio.data)}</span>`:(total&&gere()?`<button class="btn small" data-act="senhorio">Registar pagamento ao senhorio (${eur(valorSenhorio(m))})</button>`:"")}</div></div>
     <div class="hint">${total&&rendaEfetiva(m)!==total?`Com os acertos à mão; o valor calculado era ${eur(total)}. `:""}${total?textoDivisao(divisaoDe(m)):"Põe o valor total da renda deste mês para se calcular quanto cada pessoa tem de pagar."}${!senhorio&&total&&gere()?" O pagamento ao senhorio sai do fundo de maneio.":""}</div>`;
+  if(gere()&&total){
+    const ar=regraDe(m).arredondar;
+    topo+=`<div class="form-foot"><label class="check"><input type="checkbox" data-act="arred-mes"${ar?" checked":""}${S.saving?" disabled":""}><span>Arredondar para cima em ${nomeMes(m).toLowerCase()}: cada pessoa paga euros certos, igual para todos do mesmo tipo</span></label></div>`;
+  }
   if(gere()){
     const pre=total!=null?eurNum(total):(ant!=null?eurNum(ant):"");
     topo+=`<form data-form="renda-total" class="form-foot" style="align-items:flex-end" autocomplete="off">
@@ -1092,7 +1110,7 @@ const handlers={
   async "renda-total"(){
     const cent=parseValor(val("f-t-total"));if(!cent)return toast("err","Escreve o valor total da renda, por exemplo 950");
     const rendaMes=Object.assign({},S.config.rendaMes||{});rendaMes[S.mes]=cent;
-    const divisaoMes=Object.assign({},S.config.divisaoMes||{});divisaoMes[S.mes]=Object.assign(regraAtual(),{linhas:regraDe(S.mes).linhas});
+    const divisaoMes=Object.assign({},S.config.divisaoMes||{});divisaoMes[S.mes]=Object.assign(regraAtual(),{linhas:regraDe(S.mes).linhas,arredondar:regraDe(S.mes).arredondar});
     const p={rendaMes,divisaoMes,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
     const ok=await gravar(()=>guardarConfig(p),()=>Object.assign(S.config,p));
     if(ok){S.reset="f-t-";toast("ok","Renda de "+nomeMes(S.mes)+" guardada")}
@@ -1105,7 +1123,7 @@ const handlers={
     const m=S.mes,previsaoMes=Object.assign({},S.config.previsaoMes||{}),rendaMes=Object.assign({},S.config.rendaMes||{});
     previsaoMes[m]=v;rendaMes[m]=total;
     const divisaoMes=Object.assign({},S.config.divisaoMes||{});divisaoMes[m]=regra;
-    const p={previsaoMes,rendaMes,divisaoMes,comensalLinhas:regra.linhas,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
+    const p={previsaoMes,rendaMes,divisaoMes,comensalLinhas:regra.linhas,arredondarRenda:!!regra.arredondar,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
     if(v.plafond!=null&&v.plafond!==plafondDe(m)){const pm=Object.assign({},S.config.plafondMes||{});pm[m]=v.plafond;p.plafondMes=pm}
     const ok=await gravar(()=>guardarConfig(p),()=>Object.assign(S.config,p));
     if(ok){S.reset="f-p";S.reset2="f-t-";toast("ok","Renda de "+nomeMes(m)+" guardada: "+eur(total))}
@@ -1197,6 +1215,12 @@ document.addEventListener("click",async e=>{
   if(a==="entrar"){S.vista="entrar";S.fresh=true;render();window.scrollTo({top:0});return}
   if(a==="entrar-voltar"){S.vista=null;S.fresh=true;return render()}
   if(a==="eu-mudar")return escolherEu(null);
+  if(a==="arred-mes"){
+    const m=S.mes,novo=!regraDe(m).arredondar,dm=JSON.parse(JSON.stringify(S.config.divisaoMes||{}));
+    const r=regraDe(m);delete r.ajustes;dm[m]=Object.assign(r,{arredondar:novo});
+    if(await gravar(()=>guardarConfig({divisaoMes:dm,arredondarRenda:novo})))toast("ok",novo?"Renda de "+nomeMes(m).toLowerCase()+" arredondada para cima":"Arredondamento desligado em "+nomeMes(m).toLowerCase());
+    return;
+  }
   if(a==="importar"){document.getElementById("importar-ficheiro").click();return}
   if(a==="morador-editar"){S.editMorador=id;S.reset="f-e-";return render()}
   if(a==="morador-fechar"){S.editMorador=null;return render()}

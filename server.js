@@ -280,7 +280,7 @@ function dadosPessoa(b, parcial) {
   return out;
 }
 const CHAVES_CONFIG = {
-  nome: "string", plafond: "int", fundoInicial: "int", rendasNoFundo: "bool", anoInicio: "intnull",
+  nome: "string", plafond: "int", fundoInicial: "int", rendasNoFundo: "bool", arredondarRenda: "bool", anoInicio: "intnull",
   plafondMes: "obj", rendaMes: "obj", previsaoMes: "obj", divisaoMes: "obj", ajustesMes: "obj",
   despesas: "arr", comensalLinhas: "arr",
 };

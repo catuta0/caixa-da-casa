@@ -217,6 +217,7 @@ Se já tens os dados noutro sítio (por exemplo na versão que funcionava dentro
 - **Plafond da semana**: cada dia vale o plafond do mês a dividir pelos dias do mês; uma semana (de sexta a quinta) soma os seus 7 dias, mesmo que apanhe dois meses. Conta as compras com data nessa semana.
 - **Renda de cada pessoa** = parte do mês + o que ficou por pagar antes − o que pagou a mais antes − compras pagas do seu bolso nesse mês. Pode ficar negativa: nesse caso a casa deve à pessoa e a diferença passa para o mês seguinte.
 - **Divisão**: as despesas marcadas para comensais dividem-se por moradores, comensais (peso 1) e meios comensais (peso ½); o resto só pelos moradores. Os valores fixos saem primeiro. Os cêntimos que sobram vão para as primeiras pessoas por ordem alfabética.
+- **Arredondar para cima** (opção na calculadora e no cartão da renda): cada pessoa paga um valor em euros certos, igual para todos do mesmo tipo; o que sobra fica no fundo de maneio. Vale para o mês em que a ligas; os meses já definidos não mudam.
 - **Acerto à mão**: o tesoureiro pode mudar a parte de uma pessoa num mês; os outros não mudam e a renda total desse mês acompanha.
 - **Meses passados não mudam**: quando a renda de um mês é definida, a regra desse mês (quem é comensal, valores fixos, despesas escolhidas) fica guardada. Mudanças de tipo contam a partir do mês que estás a ver.
 - **Fundo de maneio**: saldo inicial + rendas recebidas + entradas − compras e contas pagas com o fundo − compras do bolso pagas em dinheiro − saídas.
