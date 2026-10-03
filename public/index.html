@@ -313,6 +313,8 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}
 .sim-contas span{display:block;font-size:12.5px;color:var(--muted)}
 .sim-contas b{font-family:var(--f-display);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
 .sim-estado{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:10px;font-size:14px}
+.pags{display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-top:2px}
+.pags .linkbtn.mini{color:var(--bad);padding:0}
 .breakdown{display:grid;gap:6px;margin-top:6px}
 .breakdown div{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.bar .fill{transition:width .4s ease}}
@@ -525,7 +527,7 @@ function porReembolsar(){
 }
 
 /* ---------- rendering ---------- */
-function schedule(){if(!schedule.q){schedule.q=true;requestAnimationFrame(()=>{schedule.q=false;render()})}}
+function schedule(){if(!schedule.q){schedule.q=true;const f=()=>{if(!schedule.q)return;schedule.q=false;render()};requestAnimationFrame(f);setTimeout(f,150)}}
 function render(){
   for(const k in _q)delete _q[k];
   const vals={};
@@ -1056,6 +1058,15 @@ async function aplicarSim(){
   if(await gravar(()=>guardarConfig(p))){S.sim=null;toast("ok","Simulação aplicada a "+nomeMes(m).toLowerCase())}
 }
 
+/* coluna "Pago": o tesoureiro pode anular cada pagamento ali mesmo */
+function celulaPago(r,d,m){
+  if(!gere())return eur(d.pago);
+  const pags=vivos().filter(x=>x.tipo==="renda"&&x.mes===m&&x.morador===r.id).sort(ordem),c=S.confirm;
+  if(!pags.length)return eur(d.pago);
+  return `${eur(d.pago)}<div class="pags">${pags.map(x=>c&&c.act==="anular"&&c.id===x.id
+    ?`<span class="confirm">Anular o pagamento de ${eur(x.cent)} (${dataCurta(x.data)})? <button class="btn small danger" data-act="conf-sim">Sim, anular</button><button class="btn small" data-act="conf-nao">Não</button></span>`
+    :`<button class="linkbtn mini" data-act="anular" data-id="${h(x.id)}" title="Anular este pagamento">anular ${eur(x.cent)}${pags.length>1?" de "+dataCurta(x.data):""}</button>`).join("")}</div>`;
+}
 /* quem conta nas rendas de um mês: quem está na casa, ou quem saiu mas ainda tem contas em aberto */
 function linhasRenda(m,vis){
   return pessoasCasa(m).filter(r=>!r.entrada||r.entrada<=m).map(r=>({r,d:rendaDe(r,m,vis)}))
@@ -1100,7 +1111,7 @@ function tRendas(){
     }
     const antes=d.antes>0?`<span style="color:var(--bad)">+${eur(d.antes)}</span>`:d.antes<0?`<span style="color:var(--good)">−${eur(-d.antes)}</span>`:"—";
     const falta=d.falta?eur(d.falta):d.aFavor?`<span style="color:var(--good)">${eur(d.aFavor)} a favor</span>`:"—";
-    return `<tr><td><b>${h(r.nome)}</b>${eComensal(r)?` <span class="chip neutral">${nomeTipo(r)}</span>`:""}${ativoEm(r,m)?"":' <span class="muted">(já saiu)</span>'}</td><td class="r num">${celulaParte(r,d,m)}</td><td class="r num">${antes}</td>${temDesc?`<td class="r num">${d.desconto?`<span style="color:var(--good)">−${eur(d.desconto)}</span>`:"—"}</td>`:""}<td class="r num"><b${d.devido<0?' style="color:var(--good)"':""}>${d.devido<0?"−"+eur(-d.devido):eur(d.devido)}</b></td><td class="r num">${eur(d.pago)}</td><td class="r num">${falta}</td><td><span class="chip ${d.estado[0]}">${d.estado[1]}</span></td><td class="r">${acao}</td></tr>`;
+    return `<tr><td><b>${h(r.nome)}</b>${eComensal(r)?` <span class="chip neutral">${nomeTipo(r)}</span>`:""}${ativoEm(r,m)?"":' <span class="muted">(já saiu)</span>'}</td><td class="r num">${celulaParte(r,d,m)}</td><td class="r num">${antes}</td>${temDesc?`<td class="r num">${d.desconto?`<span style="color:var(--good)">−${eur(d.desconto)}</span>`:"—"}</td>`:""}<td class="r num"><b${d.devido<0?' style="color:var(--good)"':""}>${d.devido<0?"−"+eur(-d.devido):eur(d.devido)}</b></td><td class="r num">${celulaPago(r,d,m)}</td><td class="r num">${falta}</td><td><span class="chip ${d.estado[0]}">${d.estado[1]}</span></td><td class="r">${acao}</td></tr>`;
   }).join("");
   const tabela=linhas.length?`<div class="tablewrap"><table><thead><tr><th>Pessoa</th><th class="r">Parte do mês</th><th class="r">Vem de trás</th>${temDesc?'<th class="r">Compras a descontar</th>':""}<th class="r">A pagar</th><th class="r">Pago</th><th class="r">Falta</th><th>Estado</th><th></th></tr></thead>
     <tbody>${rows}</tbody><tfoot><tr><td>Total</td><td class="r num">${eur(t.parte)}</td><td class="r num">${t.antes>=0?eur(t.antes):"−"+eur(-t.antes)}</td>${temDesc?`<td class="r num">−${eur(t.desc)}</td>`:""}<td class="r num">${t.pagar<0?"−"+eur(-t.pagar):eur(t.pagar)}</td><td class="r num">${eur(t.pago)}</td><td class="r num">${eur(t.falta)}</td><td colspan="2"></td></tr></tfoot></table></div>
