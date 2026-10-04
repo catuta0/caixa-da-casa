@@ -1122,7 +1122,7 @@ function tRendas(){
       if(S.rendaEdit===r.id)acao=`<form data-form="renda" data-id="${h(r.id)}" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end" autocomplete="off">
         <input id="f-r-valor" inputmode="decimal" value="${d.falta?eurNum(d.falta):""}" placeholder="Valor" aria-label="Valor pago" style="width:90px;height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)">
         <input id="f-r-data" type="date" value="${dataDefault()}" aria-label="Data do pagamento" style="height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)">
-        <select id="f-r-meio" aria-label="Como pagou" style="height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--ink)"><option value="dinheiro">Em dinheiro</option><option value="conta">Transferência para a conta</option></select>
+        <select id="f-r-meio" aria-label="Como pagou" style="height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--ink)"><option value="conta" selected>Transferência para a conta</option><option value="dinheiro">Em dinheiro</option></select>
         <button class="btn small primary" type="submit"${S.saving?" disabled":""}>Guardar</button><button class="btn small" type="button" data-act="renda-fechar">Cancelar</button></form>`;
       else acao=`<button class="btn small" data-act="renda-abrir" data-id="${h(r.id)}">Registar pagamento</button>`;
     }
