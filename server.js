@@ -237,8 +237,10 @@ function novoMovimento(b, req) {
   if (!Number.isInteger(b.cent) || b.cent <= 0 || b.cent > 1e9) falha(400, "Valor inválido.");
   if (!reMes.test(b.mes || "") || !reData.test(b.data || "")) falha(400, "Data inválida.");
   const m = { tipo, mes: b.mes, data: b.data, cent: b.cent, descricao: txt(b.descricao, 200) };
+  const meio = b.meio === "dinheiro" ? "dinheiro" : "conta";
   if (tipo === "compra" || tipo === "conta") {
     m.pagoPor = b.pagoPor === "fundo" ? "fundo" : "bolso";
+    if (m.pagoPor === "fundo") m.meio = meio;
     m.reembolsado = false;
     const quem = pessoaPorId(b.morador);
     m.morador = quem ? quem.id : "";
@@ -250,10 +252,12 @@ function novoMovimento(b, req) {
     const quem = pessoaPorId(b.morador);
     if (!quem) falha(400, "Escolhe a pessoa que pagou.");
     m.morador = quem.id; m.moradorNome = quem.nome;
+    m.meio = meio;
   }
   if (tipo === "fundo") {
-    m.sentido = b.sentido === "saida" ? "saida" : "entrada";
-    if (!m.descricao) falha(400, "Escreve uma descrição.");
+    m.sentido = ["saida", "transferencia"].includes(b.sentido) ? b.sentido : "entrada";
+    if (m.sentido === "transferencia") m.de = b.de === "conta" ? "conta" : "dinheiro";
+    else { m.meio = meio; if (!m.descricao) falha(400, "Escreve uma descrição."); }
   }
   m.fotos = fotosValidas(b.fotos);
   m.criadoPor = req.autor;
@@ -280,7 +284,7 @@ function dadosPessoa(b, parcial) {
   return out;
 }
 const CHAVES_CONFIG = {
-  nome: "string", plafond: "int", fundoInicial: "int", rendasNoFundo: "bool", arredondarRenda: "bool", anoInicio: "intnull",
+  nome: "string", plafond: "int", fundoInicial: "int", fundoInicialDinheiro: "int", rendasNoFundo: "bool", arredondarRenda: "bool", anoInicio: "intnull",
   plafondMes: "obj", rendaMes: "obj", previsaoMes: "obj", divisaoMes: "obj", ajustesMes: "obj",
   despesas: "arr", comensalLinhas: "arr", receitas: "arr",
 };
@@ -427,6 +431,12 @@ app.patch("/api/movimentos/:id", limitar("registar", 120, 36e5), (req, res) => {
     if (!["compra", "conta"].includes(m.tipo) || m.pagoPor !== "bolso") falha(400, "Este registo não foi pago do bolso.");
     if (!m.reembolsado) Object.assign(m, { reembolsado: true, reembolsadoEm: agora() });
   }
+  if (b.meio === "dinheiro" || b.meio === "conta") {
+    if (!tes) falha(403, "Só os tesoureiros podem mudar isto.");
+    const temMeio = m.tipo === "renda" || (m.tipo === "fundo" && m.sentido !== "transferencia") || (["compra", "conta"].includes(m.tipo) && m.pagoPor === "fundo");
+    if (!temMeio) falha(400, "Este registo não passa pelo fundo.");
+    m.meio = b.meio;
+  }
   if (Array.isArray(b.fotosNovas)) {
     if (!tes && !minhaCompra) falha(403, "Só podes juntar talões às compras que registaste neste aparelho.");
     m.fotos = (m.fotos || []).concat(fotosValidas(b.fotosNovas)).slice(0, 8);
@@ -545,7 +555,11 @@ app.post("/api/importar", soTesoureiro, express.json({ limit: "80mb" }), (req, r
       if (o.reembolsado) o.reembolsadoEm = txt(m.reembolsadoEm, 40);
     }
     if (m.tipo === "conta") o.categoria = txt(m.categoria, 60) || "Outra";
-    if (m.tipo === "fundo") o.sentido = m.sentido === "saida" ? "saida" : "entrada";
+    if (m.tipo === "fundo") {
+      o.sentido = ["saida", "transferencia"].includes(m.sentido) ? m.sentido : "entrada";
+      if (o.sentido === "transferencia") o.de = m.de === "conta" ? "conta" : "dinheiro";
+    }
+    if (m.meio === "dinheiro" || m.meio === "conta") o.meio = m.meio;
     o.morador = idsPessoas.has(m.morador) ? m.morador : "";
     o.moradorNome = txt(m.moradorNome, 80);
     o.fotos = (Array.isArray(m.fotos) ? m.fotos : []).map(f => mapaFotos[f && f.id]).filter(Boolean);

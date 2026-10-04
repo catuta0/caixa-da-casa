@@ -369,10 +369,24 @@ function plafondDe(m){const pm=S.config.plafondMes||{};return pm[m]!=null?pm[m]:
 function ativoEm(r,m){return (!r.entrada||r.entrada<=m)&&(!r.saida||r.saida>=m)}
 function efeito(x){
   if(x.anulado)return 0;
-  if(x.tipo==="fundo")return x.sentido==="entrada"?x.cent:-x.cent;
+  if(x.tipo==="fundo")return x.sentido==="entrada"?x.cent:x.sentido==="transferencia"?0:-x.cent;
   if(x.tipo==="renda")return S.config.rendasNoFundo?x.cent:0;
   if(x.tipo==="compra"||x.tipo==="conta"){if(x.pagoPor==="fundo"||x.reembolsado)return -x.cent;return 0}
   return 0;
+}
+/* onde está o dinheiro do fundo: na conta ou em dinheiro (registos antigos sem indicação contam como conta) */
+const meioDe=x=>x.meio==="dinheiro"?"dinheiro":"conta";
+const temMeio=x=>x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido!=="transferencia")||((x.tipo==="compra"||x.tipo==="conta")&&x.pagoPor==="fundo");
+function efeitoMeio(x){
+  const r={dinheiro:0,conta:0};if(x.anulado)return r;
+  if(x.tipo==="fundo"&&x.sentido==="transferencia"){const de=x.de==="conta"?"conta":"dinheiro";r[de]-=x.cent;r[de==="conta"?"dinheiro":"conta"]+=x.cent;return r}
+  if((x.tipo==="compra"||x.tipo==="conta")&&x.pagoPor==="bolso"){if(x.reembolsado)r.dinheiro-=x.cent;return r}
+  const e=efeito(x);if(e)r[meioDe(x)]+=e;return r;
+}
+function saldoMeioAte(m,vis){
+  vis=vis||vivos();const din=S.config.fundoInicialDinheiro||0,r={dinheiro:din,conta:(S.config.fundoInicial||0)-din};
+  vis.forEach(x=>{if(x.mes<=m){const e=efeitoMeio(x);r.dinheiro+=e.dinheiro;r.conta+=e.conta}});
+  return r;
 }
 function saldoAte(m,vis){vis=vis||vivos();return (S.config.fundoInicial||0)+vis.filter(x=>x.mes<=m).reduce((t,x)=>t+efeito(x),0)}
 function stats(m,vis){
@@ -577,7 +591,7 @@ function descMov(x){
   if(x.tipo==="compra")return x.descricao||"Compras";
   if(x.tipo==="conta")return (x.categoria||"Conta")+(x.descricao?" — "+x.descricao:"");
   if(x.tipo==="renda")return "Renda — "+(x.moradorNome||"?");
-  if(x.tipo==="fundo")return x.descricao||(x.sentido==="entrada"?"Entrada no fundo":"Saída do fundo");
+  if(x.tipo==="fundo")return x.descricao||(x.sentido==="transferencia"?(x.de==="conta"?"Levantamento da conta":"Depósito na conta"):x.sentido==="entrada"?"Entrada no fundo":"Saída do fundo");
   return "";
 }
 function linhaMov(x,opts){
@@ -594,10 +608,11 @@ function linhaMov(x,opts){
   if(x.tipo==="renda"&&x.mes!==(x.data||"").slice(0,7))meta.push("renda de "+nomeMesCurto(x.mes));
   let chip="";
   if(x.tipo==="compra"||x.tipo==="conta"){
-    if(x.pagoPor==="fundo")meta.push("pago com o fundo");
+    if(x.pagoPor==="fundo")meta.push("pago com o fundo ("+(meioDe(x)==="dinheiro"?"dinheiro":"conta")+")");
     else chip=x.reembolsado?`<span class="chip good">pago em dinheiro a ${h(x.moradorNome||"?")}</span>`:`<span class="chip warn">descontado na renda de ${nomeMesCurto(x.mes)} de ${h(x.moradorNome||"?")}</span>`;
   }
-  if(x.tipo==="fundo")meta.push(x.sentido==="entrada"?"entrada":"saída");
+  if(x.tipo==="fundo")meta.push(x.sentido==="transferencia"?(x.de==="conta"?"conta → dinheiro":"dinheiro → conta"):(x.sentido==="entrada"?"entrada":"saída")+(meioDe(x)==="dinheiro"?" em dinheiro":" na conta"));
+  if(x.tipo==="renda")meta.push(meioDe(x)==="dinheiro"?"em dinheiro":"por transferência");
   const quem=x.criadoPor&&(S.names[x.criadoPor]||x.criadoPorNome);
   if(quem)meta.push("registado por "+h(quem));
   if(x.anulado){const q=x.anuladoPor&&(S.names[x.anuladoPor]||x.anuladoPorNome);chip+=`<span class="chip bad">anulado${q?" por "+h(q):""}</span>`}
@@ -611,11 +626,12 @@ function linhaMov(x,opts){
   }else if(S.canWrite&&!x.anulado){
     if(gere()&&eBolso(x)&&!x.reembolsado&&x.mes>=addMes(hojeMes(),-1))acts+=`<button class="btn small" data-act="reemb" data-id="${x.id}">Pagar em dinheiro</button>`;
     if((x.tipo==="compra"||x.tipo==="conta")&&podeFotos()&&(gere()||(eMeu(x)&&x.tipo==="compra")))acts+=`<button class="linkbtn" data-act="foto-add" data-alvo="mov:${x.id}">${x.fotos&&x.fotos.length?"Juntar outro talão":"Juntar talão"}</button>`;
+    if(gere()&&temMeio(x))acts+=`<button class="linkbtn" data-act="mudar-meio" data-id="${x.id}">${meioDe(x)==="dinheiro"?"Foi pela conta":"Foi em dinheiro"}</button>`;
     if(podeAnular(x))acts+=`<button class="linkbtn" data-act="anular" data-id="${x.id}">Anular</button>`;
   }
   return `<li class="mov${x.anulado?" anulado":""}">
     <div><div class="mov-desc">${h(descMov(x))}</div><div class="mov-meta">${meta.filter(Boolean).map(m=>`<span>${m}</span>`).join("")}${chip}</div>${fotosMov(x)}</div>
-    <div class="mov-val${entrada?" in":""}">${entrada?"+":""}${eur(x.cent)}</div>
+    <div class="mov-val${entrada?" in":""}">${x.tipo==="fundo"&&x.sentido==="transferencia"?"↔ ":entrada?"+":""}${eur(x.cent)}</div>
     ${acts?`<div class="mov-actions">${acts}</div>`:""}</li>`;
 }
 function lista(items,vazio,opts){
@@ -679,7 +695,7 @@ function tResumo(){
   const numeros=`<div class="card numeros"><div class="eyebrow">${nomeMes(m)} em números</div><div class="nums">
     <button class="num-item" data-act="filtro" data-f="conta"><span>Contas da casa</span><b>${eur(st.contas)}</b></button>
     <button class="num-item" data-act="tab" data-t="rendas"><span>Rendas por receber</span><b>${eur(totaisRenda(m,vis).falta)}</b><small>${totaisRenda(m,vis).antes>0?"inclui "+eur(totaisRenda(m,vis).antes)+" de meses anteriores · ":""}já recebidos ${eur(st.rendasRec)}</small></button>
-    <button class="num-item" data-act="tab" data-t="fundo"><span>Fundo de maneio</span><b${st.saldo<0?' style="color:var(--bad)"':""}>${eur(st.saldo)}</b></button></div></div>`;
+    <button class="num-item" data-act="tab" data-t="fundo"><span>Fundo de maneio</span><b${st.saldo<0?' style="color:var(--bad)"':""}>${eur(st.saldo)}</b><small>conta ${eur(saldoMeioAte(m,vis).conta)} · dinheiro ${eur(saldoMeioAte(m,vis).dinheiro)}</small></button></div></div>`;
 
   return cardEu(m,vis)+setup+hero+formAberto+cardSemana(m,vis)+registos+numeros;
 }
@@ -813,7 +829,7 @@ function formCompra(noResumo){
       <label class="fld"><span>Valor (€)</span><input id="f-c-valor" inputmode="decimal" placeholder="0,00" required></label>
       <label class="fld"><span>Data</span><input id="f-c-data" type="date" value="${dataDefault()}" required></label>
       <label class="fld"><span>Quem comprou</span><select id="f-c-quem">${optsMoradores(m,true)}</select></label>
-      <label class="fld"><span>Pago com</span><select id="f-c-pago"><option value="bolso" selected>Do meu bolso (desconta na minha renda)</option><option value="fundo">Dinheiro do fundo de maneio</option></select></label>
+      <label class="fld"><span>Pago com</span><select id="f-c-pago"><option value="bolso" selected>Do meu bolso (desconta na minha renda)</option><option value="fundo-dinheiro">Fundo de maneio, em dinheiro</option><option value="fundo-conta">Fundo de maneio, pela conta (cartão/transferência)</option></select></label>
       ${blocoFotos("c")}
     </div>
     <div class="form-foot">${btnGuardar("Guardar compra")}${noResumo?'<button type="button" class="btn" data-act="resumo-fechar">Cancelar</button>':""}<span class="hint">Conta para o plafond do mês da data.</span></div></form>`;
@@ -828,7 +844,7 @@ function formConta(noResumo){
       <label class="fld"><span>Mês a que se refere</span><select id="f-k-mes">${optsMeses(m)}</select></label>
       <label class="fld"><span>Data do pagamento</span><input id="f-k-data" type="date" value="${dataDefault()}" required></label>
       <label class="fld"><span>Quem pagou</span><select id="f-k-quem">${optsMoradores(m,true)}</select></label>
-      <label class="fld"><span>Pago com</span><select id="f-k-pago"><option value="fundo">Dinheiro do fundo de maneio</option><option value="bolso">Do meu bolso (desconta na minha renda)</option></select></label>
+      <label class="fld"><span>Pago com</span><select id="f-k-pago"><option value="fundo-conta">Fundo de maneio, pela conta (débito/transferência)</option><option value="fundo-dinheiro">Fundo de maneio, em dinheiro</option><option value="bolso">Do meu bolso (desconta na minha renda)</option></select></label>
       ${blocoFotos("k")}
     </div>
     <div class="form-foot">${btnGuardar("Guardar conta")}${noResumo?'<button type="button" class="btn" data-act="resumo-fechar">Cancelar</button>':""}</div></form>`;
@@ -1106,6 +1122,7 @@ function tRendas(){
       if(S.rendaEdit===r.id)acao=`<form data-form="renda" data-id="${h(r.id)}" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end" autocomplete="off">
         <input id="f-r-valor" inputmode="decimal" value="${d.falta?eurNum(d.falta):""}" placeholder="Valor" aria-label="Valor pago" style="width:90px;height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)">
         <input id="f-r-data" type="date" value="${dataDefault()}" aria-label="Data do pagamento" style="height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)">
+        <select id="f-r-meio" aria-label="Como pagou" style="height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--ink)"><option value="dinheiro">Em dinheiro</option><option value="conta">Transferência para a conta</option></select>
         <button class="btn small primary" type="submit"${S.saving?" disabled":""}>Guardar</button><button class="btn small" type="button" data-act="renda-fechar">Cancelar</button></form>`;
       else acao=`<button class="btn small" data-act="renda-abrir" data-id="${h(r.id)}">Registar pagamento</button>`;
     }
@@ -1127,20 +1144,23 @@ function tRendas(){
 function tFundo(){
   const m=S.mes,vis=vivos();
   const inicio=saldoAte(addMes(m,-1),vis);
-  const ls=vis.filter(x=>x.mes===m&&efeito(x)!==0).sort((a,b)=>-ordem(a,b));
+  const ls=vis.filter(x=>x.mes===m&&(efeito(x)!==0||(x.tipo==="fundo"&&x.sentido==="transferencia")||(eBolso(x)&&x.reembolsado))).sort((a,b)=>-ordem(a,b));
+  const sm=saldoMeioAte(m,vis);
   let s=inicio,ent=0,sai=0;
   const rows=ls.map(x=>{const e=efeito(x);s+=e;if(e>0)ent+=e;else sai-=e;
-    return `<tr><td class="num">${dataCurta(x.data)}</td><td>${h(descMov(x))}${x.tipo==="compra"?' <span class="muted">· compra</span>':x.tipo==="conta"?' <span class="muted">· conta</span>':""}${(x.tipo==="compra"||x.tipo==="conta")&&x.pagoPor==="bolso"?' <span class="muted">(pago em dinheiro)</span>':""}</td><td class="r num in">${e>0?eur(e):""}</td><td class="r num">${e<0?eur(-e):""}</td><td class="r num">${eur(s)}</td></tr>`}).join("");
-  const form=gere()?`<form class="card form" data-form="fundo" autocomplete="off"><h3>Entrada ou saída de dinheiro</h3>
+    const em=x.tipo==="fundo"&&x.sentido==="transferencia"?(x.de==="conta"?"conta → dinheiro":"dinheiro → conta"):eBolso(x)?"dinheiro":meioDe(x);
+    return `<tr><td class="num">${dataCurta(x.data)}</td><td>${h(descMov(x))} <span class="chip neutral">${em}</span>${x.tipo==="compra"?' <span class="muted">· compra</span>':x.tipo==="conta"?' <span class="muted">· conta</span>':""}${(x.tipo==="compra"||x.tipo==="conta")&&x.pagoPor==="bolso"?' <span class="muted">(pago em dinheiro)</span>':""}</td><td class="r num in">${e>0?eur(e):""}</td><td class="r num">${e<0?eur(-e):""}</td><td class="r num">${eur(s)}</td></tr>`}).join("");
+  const form=gere()?`<form class="card form" data-form="fundo" autocomplete="off"><h3>Movimento no fundo</h3>
     <div class="grid">
-      <label class="fld"><span>Movimento</span><select id="f-f-sentido"><option value="entrada">Entrada (reforço, donativo, quota…)</option><option value="saida">Saída (levantamento, outra despesa…)</option></select></label>
+      <label class="fld"><span>Movimento</span><select id="f-f-sentido"><option value="entrada-dinheiro">Entrada em dinheiro</option><option value="entrada-conta">Entrada na conta</option><option value="saida-dinheiro">Saída em dinheiro</option><option value="saida-conta">Saída da conta</option><option value="transf-dinheiro">Depositar dinheiro na conta</option><option value="transf-conta">Levantar da conta para dinheiro</option></select></label>
       <label class="fld"><span>Valor (€)</span><input id="f-f-valor" inputmode="decimal" placeholder="0,00" required></label>
-      <label class="fld wide"><span>Descrição</span><input id="f-f-desc" maxlength="120" placeholder="Ex.: Quota da associação, donativo, acerto de caixa" required></label>
+      <label class="fld wide"><span>Descrição</span><input id="f-f-desc" maxlength="120" placeholder="Ex.: Quota da associação, donativo, acerto de caixa"></label>
       <label class="fld"><span>Data</span><input id="f-f-data" type="date" value="${dataDefault()}" required></label>
     </div>
-    <div class="form-foot">${btnGuardar("Guardar movimento")}<span class="hint">Compras, contas e rendas já entram aqui sozinhas.</span></div></form>`:"";
+    <div class="form-foot">${btnGuardar("Guardar movimento")}<span class="hint">Compras, contas e rendas já entram aqui sozinhas. Depósitos e levantamentos não mudam o total, só onde está o dinheiro.</span></div></form>`:"";
   const manuais=allMovs().filter(x=>x.tipo==="fundo"&&x.mes===m).sort(ordem);
-  return cardReembolsos()+`<div class="card"><div class="section-head"><div><div class="eyebrow">Saldo do fundo de maneio no fim de ${nomeMes(m).toLowerCase()}</div><div class="big" ${s<0?'style="color:var(--bad)"':""}>${eur(s)}</div></div>
+  return cardReembolsos()+`<div class="card"><div class="section-head"><div><div class="eyebrow">Saldo do fundo de maneio no fim de ${nomeMes(m).toLowerCase()}</div><div class="big" ${s<0?'style="color:var(--bad)"':""}>${eur(s)}</div>
+      <div class="sim-contas" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:10px"><div><span>Na conta</span><b${sm.conta<0?' style="color:var(--bad)"':""}>${eur(sm.conta)}</b></div><div><span>Em dinheiro</span><b${sm.dinheiro<0?' style="color:var(--bad)"':""}>${eur(sm.dinheiro)}</b></div></div></div>
       <div class="num muted" style="text-align:right;font-size:14px">entradas <span style="color:var(--good)">+${eur(ent)}</span><br>saídas −${eur(sai)}</div></div>
     <div class="tablewrap"><table class="ledger"><thead><tr><th>Data</th><th>Descrição</th><th class="r">Entrada</th><th class="r">Saída</th><th class="r">Saldo</th></tr></thead>
     <tbody><tr class="open"><td></td><td>Saldo que vinha do mês anterior</td><td></td><td></td><td class="r num">${eur(inicio)}</td></tr>${rows||'<tr><td colspan="5" class="empty">Sem movimentos no fundo neste mês.</td></tr>'}</tbody></table></div></div>
@@ -1174,6 +1194,7 @@ function tDefinicoes(){
       <label class="fld"><span>Plafond mensal de compras (€)</span><input id="f-s-plafond" inputmode="decimal" value="${eurNum(c.plafond)}"></label>
       <label class="fld"><span>Plafond só de ${nomeMes(m).toLowerCase()} (€)</span><input id="f-s-plafondmes" inputmode="decimal" placeholder="Igual ao mensal" value="${pm!=null?eurNum(pm):""}"></label>
       <label class="fld"><span>Saldo inicial do fundo de maneio (€)</span><input id="f-s-inicial" inputmode="decimal" value="${eurNum(c.fundoInicial)}"></label>
+      <label class="fld"><span>Desse saldo, quanto era em dinheiro (€)</span><input id="f-s-inicial-din" inputmode="decimal" placeholder="0,00" value="${c.fundoInicialDinheiro?eurNum(c.fundoInicialDinheiro):""}"></label>
       <label class="check fld wide"><input type="checkbox" id="f-s-rendas"${c.rendasNoFundo?" checked":""}><span>As rendas pagas entram no fundo de maneio (o pagamento ao senhorio regista-se no separador Rendas)</span></label>
     </div>
     <div class="form-foot">${btnGuardar("Guardar definições")}<span class="hint">O saldo inicial é o dinheiro que havia no fundo quando começaram a usar esta página.</span></div></form>`;
@@ -1275,25 +1296,26 @@ const handlers={
   async compra(){
     const cent=parseValor(val("f-c-valor"));if(!cent)return toast("err","Escreve o valor, por exemplo 12,50");
     const data=val("f-c-data");if(!data)return toast("err","Escolhe a data da compra");
-    const quem=val("f-c-quem"),pago=val("f-c-pago");
+    const quem=val("f-c-quem"),pv=val("f-c-pago"),pago=pv==="bolso"?"bolso":"fundo",meio=pv==="fundo-conta"?"conta":"dinheiro";
     if(pago==="bolso"&&!quem)return toast("err","Diz quem pagou do bolso, para se saber a quem reembolsar");
     const fotos=await fotosDoForm("c");if(fotos===null)return;
-    const ok=await addMov({tipo:"compra",mes:data.slice(0,7),data,cent,descricao:val("f-c-desc").trim(),morador:quem,moradorNome:nomeMorador(quem),pagoPor:pago,reembolsado:false,fotos});
+    const ok=await addMov({tipo:"compra",mes:data.slice(0,7),data,cent,descricao:val("f-c-desc").trim(),morador:quem,moradorNome:nomeMorador(quem),pagoPor:pago,meio,reembolsado:false,fotos});
     if(ok){limparFotos("c");S.resumoForm=null;S.reset="f-c-";toast("ok",data.slice(0,7)===S.mes?"Compra guardada":"Compra guardada em "+nomeMes(data.slice(0,7)))}
   },
   async conta(){
     const cent=parseValor(val("f-k-valor"));if(!cent)return toast("err","Escreve o valor, por exemplo 38,20");
     const data=val("f-k-data");if(!data)return toast("err","Escolhe a data do pagamento");
-    const quem=val("f-k-quem"),pago=val("f-k-pago"),mes=val("f-k-mes")||S.mes;
+    const quem=val("f-k-quem"),pv=val("f-k-pago"),pago=pv==="bolso"?"bolso":"fundo",meio=pv==="fundo-dinheiro"?"dinheiro":"conta",mes=val("f-k-mes")||S.mes;
     if(pago==="bolso"&&!quem)return toast("err","Diz quem pagou do bolso, para se saber a quem reembolsar");
     const fotos=await fotosDoForm("k");if(fotos===null)return;
-    const ok=await addMov({tipo:"conta",mes,data,cent,categoria:val("f-k-tipo"),descricao:val("f-k-desc").trim(),morador:quem,moradorNome:nomeMorador(quem),pagoPor:pago,reembolsado:false,fotos});
+    const ok=await addMov({tipo:"conta",mes,data,cent,categoria:val("f-k-tipo"),descricao:val("f-k-desc").trim(),morador:quem,moradorNome:nomeMorador(quem),pagoPor:pago,meio,reembolsado:false,fotos});
     if(ok){limparFotos("k");S.resumoForm=null;S.reset="f-k-";toast("ok","Conta guardada em "+nomeMes(mes))}
   },
   async renda(form){
     const id=form.dataset.id,cent=parseValor(val("f-r-valor"));if(!cent)return toast("err","Escreve o valor pago");
     const data=val("f-r-data")||hoje();
-    const ok=await addMov({tipo:"renda",mes:S.mes,data,cent,morador:id,moradorNome:nomeMorador(id)});
+    const meio=val("f-r-meio")==="conta"?"conta":"dinheiro";
+    const ok=await addMov({tipo:"renda",mes:S.mes,data,cent,morador:id,moradorNome:nomeMorador(id),meio});
     if(ok){S.rendaEdit=null;S.reset="f-r-";toast("ok","Pagamento de renda guardado")}
   },
   async "renda-total"(){
@@ -1326,9 +1348,11 @@ const handlers={
   },
   async fundo(){
     const cent=parseValor(val("f-f-valor"));if(!cent)return toast("err","Escreve o valor");
-    const desc=val("f-f-desc").trim();if(!desc)return toast("err","Escreve uma descrição, para todos perceberem o movimento");
+    const [tipoMov,onde]=val("f-f-sentido").split("-"),transf=tipoMov==="transf";
+    const desc=val("f-f-desc").trim();if(!desc&&!transf)return toast("err","Escreve uma descrição, para todos perceberem o movimento");
     const data=val("f-f-data");if(!data)return toast("err","Escolhe a data");
-    const ok=await addMov({tipo:"fundo",mes:data.slice(0,7),data,cent,sentido:val("f-f-sentido"),descricao:desc});
+    const mov=transf?{tipo:"fundo",mes:data.slice(0,7),data,cent,sentido:"transferencia",de:onde,descricao:desc}:{tipo:"fundo",mes:data.slice(0,7),data,cent,sentido:tipoMov,meio:onde,descricao:desc};
+    const ok=await addMov(mov);
     if(ok){S.reset="f-f-";toast("ok","Movimento guardado")}
   },
   async config(){
@@ -1337,7 +1361,8 @@ const handlers={
     let plafondMes=Object.assign({},S.config.plafondMes||{});
     if(plm===""){delete plafondMes[S.mes]}else{const v=plm==="0"?0:parseValor(plm);if(v==null)return toast("err","O plafond do mês tem de ser um valor, ou fica vazio");plafondMes[S.mes]=v}
     let fundoInicial=0;if(ini!==""&&ini!=="0"){const neg=ini.startsWith("-");const v=parseValor(ini.replace(/^-/,""));if(v==null)return toast("err","O saldo inicial tem de ser um valor");fundoInicial=neg?-v:v}
-    const p={nome:val("f-s-nome").trim()||DEF.nome,plafond,plafondMes,fundoInicial,rendasNoFundo:document.getElementById("f-s-rendas").checked,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
+    const ind=val("f-s-inicial-din").trim();let fundoInicialDinheiro=0;if(ind!==""&&ind!=="0"){const v=parseValor(ind);if(v==null)return toast("err","O valor em dinheiro tem de ser um valor");fundoInicialDinheiro=v}
+    const p={nome:val("f-s-nome").trim()||DEF.nome,plafond,plafondMes,fundoInicial,fundoInicialDinheiro,rendasNoFundo:document.getElementById("f-s-rendas").checked,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
     const ok=await gravar(()=>guardarConfig(p),()=>Object.assign(S.config,p));
     if(ok){S.reset="f-s-";S.fresh=true;toast("ok","Definições guardadas")}
   },
@@ -1411,6 +1436,7 @@ document.addEventListener("click",async e=>{
   if(a==="entrar"){S.vista="entrar";S.fresh=true;render();window.scrollTo({top:0});return}
   if(a==="entrar-voltar"){S.vista=null;S.fresh=true;return render()}
   if(a==="eu-mudar")return escolherEu(null);
+  if(a==="mudar-meio"){if(!gere())return semPermissao();const x=allMovs().find(y=>y.id===id);if(x){const novo=meioDe(x)==="dinheiro"?"conta":"dinheiro";if(await patchMov(x,{meio:novo}))toast("ok",novo==="conta"?"Passou para a conta":"Passou para dinheiro")}return}
   if(a==="sim-repor"){iniciarSim(S.mes);return render()}
   if(a==="sim-repor-pessoas"){recalcSim(true);return render()}
   if(a==="sim-g-rm"){const k=b.dataset.k;S.sim.extras=S.sim.extras.filter(x=>x.k!==k);delete S.sim.v[k];S.sim.linhasCom=S.sim.linhasCom.filter(x=>x!==k);recalcSim(false);return render()}
@@ -1465,7 +1491,7 @@ document.addEventListener("click",async e=>{
   }
   if(a==="senhorio"){
     const t=valorSenhorio(S.mes);if(!t)return;
-    if(await addMov({tipo:"conta",mes:S.mes,data:dataDefault(),cent:t,categoria:"Renda da casa",descricao:"Pagamento ao senhorio",morador:"",moradorNome:"",pagoPor:"fundo",reembolsado:false}))toast("ok","Pagamento ao senhorio registado");
+    if(await addMov({tipo:"conta",mes:S.mes,data:dataDefault(),cent:t,categoria:"Renda da casa",descricao:"Pagamento ao senhorio",morador:"",moradorNome:"",pagoPor:"fundo",meio:"conta",reembolsado:false}))toast("ok","Pagamento ao senhorio registado");
     return;
   }
   if(a==="exportar")return exportar(b.dataset.q);
@@ -1502,10 +1528,11 @@ document.getElementById("importar-ficheiro").addEventListener("change",async e=>
 async function exportar(q){
   const cel=s=>{s=String(s==null?"":s);return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
   const itens=allMovs().filter(x=>q==="tudo"||x.mes===S.mes).sort((a,b)=>-ordem(a,b));
-  const linhas=[["Data","Mês","Tipo","Descrição","Pessoa","Pago com","Entrada","Saída","Efeito no fundo","Estado"].join(";")];
+  const linhas=[["Data","Mês","Tipo","Descrição","Pessoa","Pago com","Conta ou dinheiro","Entrada","Saída","Efeito no fundo","Estado"].join(";")];
   itens.forEach(x=>{const ent=x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido==="entrada");
     const pago=x.tipo==="compra"||x.tipo==="conta"?(x.pagoPor==="fundo"?"fundo":"bolso"+(x.reembolsado?" (pago em dinheiro)":" (descontado na renda de "+nomeMes(x.mes).toLowerCase()+")")):"";
-    linhas.push([x.data,x.mes,{compra:"Compra",conta:"Conta",renda:"Renda",fundo:"Fundo"}[x.tipo],descMov(x),x.moradorNome||"",pago,ent?eurNum(x.cent):"",ent?"":eurNum(x.cent),eurNum(efeito(x)),x.anulado?"anulado":"válido"].map(cel).join(";"))});
+    const onde=x.tipo==="fundo"&&x.sentido==="transferencia"?(x.de==="conta"?"conta → dinheiro":"dinheiro → conta"):temMeio(x)?meioDe(x):eBolso(x)&&x.reembolsado?"dinheiro":"";
+    linhas.push([x.data,x.mes,{compra:"Compra",conta:"Conta",renda:"Renda",fundo:"Fundo"}[x.tipo],descMov(x),x.moradorNome||"",pago,onde,ent?eurNum(x.cent):"",ent?"":eurNum(x.cent),eurNum(efeito(x)),x.anulado?"anulado":"válido"].map(cel).join(";"))});
   const nome=(q==="tudo"?"caixa-da-casa-tudo":"caixa-da-casa-"+S.mes)+".csv";
   const url=URL.createObjectURL(new Blob(["\ufeff"+linhas.join("\r\n")],{type:"text/csv;charset=utf-8"}));
   const a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();

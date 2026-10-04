@@ -9,7 +9,7 @@ Livro de caixa para casas comunitárias e associações. Toda a gente vê as con
 - **Simulação** (separador próprio): experimenta sem gravar nada. Mexe nos gastos previstos (mudar valores, juntar gastos novos, escolher o que os comensais pagam), junta receitas mensais ou anuais que abatem na renda, e muda o valor de qualquer pessoa: com «ajustar automaticamente» os outros acompanham sem mudar o total; sem isso, vês quanto sobra ou falta. O tesoureiro pode aplicar o resultado ao mês.
 - **Compras pagas do próprio bolso**: são descontadas logo na renda de quem pagou (ou pagas em dinheiro pelo tesoureiro, se a pessoa precisar).
 - **Fotos dos talões** em cada compra ou conta.
-- **Fundo de maneio**: livro de caixa com entradas, saídas e saldo, mês a mês.
+- **Fundo de maneio**: livro de caixa com entradas, saídas e saldo, mês a mês, separado entre o que está na conta e o que está em dinheiro.
 - **Histórico** de todos os meses e exportação para Excel (CSV).
 - **Sem contas para o dia a dia**: quem tem o link vê tudo e regista compras. Só os **tesoureiros** entram (com a conta Google), e um tesoureiro novo tem de ser aprovado por outro.
 - Funciona bem no telemóvel.
@@ -222,6 +222,7 @@ Se já tens os dados noutro sítio (por exemplo na versão que funcionava dentro
 - **Acerto à mão**: o tesoureiro pode mudar a parte de uma pessoa num mês; os outros não mudam e a renda total desse mês acompanha.
 - **Meses passados não mudam**: quando a renda de um mês é definida, a regra desse mês (quem é comensal, valores fixos, despesas escolhidas) fica guardada. Mudanças de tipo contam a partir do mês que estás a ver.
 - **Fundo de maneio**: saldo inicial + rendas recebidas + entradas − compras e contas pagas com o fundo − compras do bolso pagas em dinheiro − saídas.
+- **Conta e dinheiro**: cada pagamento de renda, compra ou conta paga pelo fundo e movimento manual diz se foi em dinheiro ou pela conta, e o fundo mostra o total, quanto está na conta e quanto está em dinheiro. Depósitos e levantamentos passam dinheiro de um lado para o outro sem mudar o total. Registos antigos sem indicação contam como conta (o tesoureiro pode mudar cada um com «Foi em dinheiro» / «Foi pela conta»). Em Definições indica-se quanto do saldo inicial era em dinheiro.
 - **Nada se apaga**: registos errados são **anulados** e ficam visíveis, riscados, com o nome de quem anulou.
 
 ## Cópias de segurança
