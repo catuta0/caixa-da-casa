@@ -325,6 +325,7 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}
 <div class="wrap" id="app"><div class="loading">A abrir o livro de caixa…</div></div>
 <div id="toast" hidden></div>
 <input type="file" id="anexo" accept="image/*,application/pdf" multiple hidden>
+<input type="file" id="anexo-camara" accept="image/*" capture="environment" hidden>
 <input type="file" id="importar-ficheiro" accept="application/json,.json" hidden>
 
 <script>
@@ -634,7 +635,7 @@ function linhaMov(x,opts){
       <button class="btn small" data-act="conf-nao">Cancelar</button></div>`;
   }else if(S.canWrite&&!x.anulado){
     if(gere()&&eBolso(x)&&!x.reembolsado&&x.mes>=addMes(hojeMes(),-1))acts+=`<button class="btn small" data-act="reemb" data-id="${x.id}">Pagar em dinheiro</button>`;
-    if((x.tipo==="compra"||x.tipo==="conta")&&podeFotos()&&(gere()||(eMeu(x)&&x.tipo==="compra")))acts+=`<button class="linkbtn" data-act="foto-add" data-alvo="mov:${x.id}">${x.fotos&&x.fotos.length?"Juntar outro talão":"Juntar talão"}</button>`;
+    if((x.tipo==="compra"||x.tipo==="conta")&&podeFotos()&&(gere()||(eMeu(x)&&x.tipo==="compra")))acts+=`<button class="linkbtn" data-act="foto-camara" data-alvo="mov:${x.id}">${x.fotos&&x.fotos.length?"Outra foto do talão":"Tirar foto do talão"}</button><button class="linkbtn" data-act="foto-add" data-alvo="mov:${x.id}">Juntar ficheiro</button>`;
     if(gere()&&temMeio(x))acts+=`<button class="linkbtn" data-act="mudar-meio" data-id="${x.id}">${meioDe(x)==="dinheiro"?"Foi pela conta":"Foi em dinheiro"}</button>`;
     if(podeAnular(x))acts+=`<button class="linkbtn" data-act="anular" data-id="${x.id}">Anular</button>`;
   }
@@ -822,7 +823,8 @@ function limparFotos(alvo){S.fotos[alvo].forEach(f=>{try{URL.revokeObjectURL(f.u
 function blocoFotos(alvo){
   if(!podeFotos())return "";
   const fs=S.fotos[alvo];
-  return `<div class="fld wide"><span>Foto do talão (opcional)</span><div class="fotos-row">${fs.map((f,i)=>`<span class="thumb">${f.pdf?'<span class="thumb-pdf">PDF</span>':`<img src="${f.url}" alt="Talão ${i+1}">`}<button type="button" class="thumb-x" data-act="foto-tirar" data-alvo="${alvo}" data-i="${i}" aria-label="Tirar esta foto">×</button></span>`).join("")}${fs.length<4?`<button type="button" class="btn" data-act="foto-add" data-alvo="${alvo}">${fs.length?"Juntar outra":"Tirar ou escolher foto"}</button>`:""}</div></div>`;
+  const botoes=fs.length<4?`<button type="button" class="btn" data-act="foto-camara" data-alvo="${alvo}">Tirar foto</button><button type="button" class="btn" data-act="foto-add" data-alvo="${alvo}">Escolher ficheiro</button>`:"";
+  return `<div class="fld wide"><span>Foto do talão (opcional)</span><div class="fotos-row">${fs.map((f,i)=>`<span class="thumb">${f.pdf?'<span class="thumb-pdf">PDF</span>':`<img src="${f.url}" alt="Talão ${i+1}">`}<button type="button" class="thumb-x" data-act="foto-tirar" data-alvo="${alvo}" data-i="${i}" aria-label="Tirar esta foto">×</button></span>`).join("")}${botoes}</div></div>`;
 }
 function fotosMov(x){
   if(!x.fotos||!x.fotos.length)return "";
@@ -1468,6 +1470,7 @@ document.addEventListener("click",async e=>{
   if(a==="ir-mes"){S.mes=b.dataset.m;return ir("resumo")}
   if(a==="desp-add")return addDespesa();
   if(a==="foto-add"){S.anexoAlvo=b.dataset.alvo;anexo.click();return}
+  if(a==="foto-camara"){S.anexoAlvo=b.dataset.alvo;document.getElementById("anexo-camara").click();return}
   if(a==="foto-tirar"){const l=S.fotos[b.dataset.alvo],i=+b.dataset.i;if(l&&l[i]){try{URL.revokeObjectURL(l[i].url)}catch(e){}l.splice(i,1)}return render()}
   if(a==="foto-ver"){S.verFoto=b.dataset.src;return render()}
   if(a==="foto-fechar"){S.verFoto=null;return render()}
@@ -1508,8 +1511,8 @@ document.addEventListener("click",async e=>{
 
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.verFoto){S.verFoto=null;render()}});
 const anexo=document.getElementById("anexo");
-anexo.addEventListener("change",async()=>{
-  const files=[...anexo.files];anexo.value="";const alvo=S.anexoAlvo;S.anexoAlvo=null;
+async function anexoEscolhido(e){
+  const inp=e.target,files=[...inp.files];inp.value="";const alvo=S.anexoAlvo;S.anexoAlvo=null;
   if(!files.length||!alvo)return;
   const bons=files.filter(f=>f.type.startsWith("image/")||f.type==="application/pdf");
   if(bons.length<files.length)toast("err","Só dá para juntar fotos ou PDF.");
@@ -1524,7 +1527,9 @@ anexo.addEventListener("change",async()=>{
   const l=S.fotos[alvo];if(!l)return;
   bons.slice(0,4-l.length).forEach(f=>l.push({file:f,url:URL.createObjectURL(f),pdf:f.type==="application/pdf"}));
   schedule();
-});
+}
+anexo.addEventListener("change",anexoEscolhido);
+document.getElementById("anexo-camara").addEventListener("change",anexoEscolhido);
 
 document.getElementById("importar-ficheiro").addEventListener("change",async e=>{
   const f=e.target.files[0];e.target.value="";if(!f)return;
