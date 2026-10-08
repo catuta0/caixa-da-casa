@@ -594,11 +594,20 @@ function descMov(x){
   if(x.tipo==="fundo")return x.descricao||(x.sentido==="transferencia"?(x.de==="conta"?"Levantamento da conta":"Depósito na conta"):x.sentido==="entrada"?"Entrada no fundo":"Saída do fundo");
   return "";
 }
+function textoAnular(x){
+  let t="Anular este registo? Continua visível, riscado, e deixa de contar.";
+  if(eBolso(x)&&!x.reembolsado)t+=` Estava descontado na renda de ${h(x.moradorNome||"quem pagou")} em ${nomeMes(x.mes).toLowerCase()}: esse desconto desaparece e a renda dessa pessoa sobe ${eur(x.cent)}.`;
+  else if(eBolso(x)&&x.reembolsado)t+=` Já foi pago em dinheiro a ${h(x.moradorNome||"quem pagou")}: o fundo volta a ter esses ${eur(x.cent)}.`;
+  return t;
+}
 function linhaMov(x,opts){
   opts=opts||{};
   if(opts.compacto){
-    const ent=x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido==="entrada");
-    return `<li class="mov${x.anulado?" anulado":""}"><div><div class="mov-desc">${h(descMov(x))}</div><div class="mov-meta"><span>${dataCurta(x.data)}${x.moradorNome&&x.tipo!=="renda"?" · "+h(x.moradorNome):""}</span>${x.fotos&&x.fotos.length?"<span>· com talão</span>":""}${x.anulado?'<span class="chip bad">anulado</span>':""}</div></div><div class="mov-val${ent?" in":""}">${ent?"+":""}${eur(x.cent)}</div></li>`;
+    const ent=x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido==="entrada"),c=S.confirm;
+    const acts=!x.anulado&&podeAnular(x)?(c&&c.act==="anular"&&c.id===x.id
+      ?`<div class="mov-actions"><div class="confirm">${textoAnular(x)} <button class="btn small danger" data-act="conf-sim">Sim, anular</button><button class="btn small" data-act="conf-nao">Cancelar</button></div></div>`
+      :`<div class="mov-actions"><button class="linkbtn mini" data-act="anular" data-id="${x.id}">Anular</button></div>`):"";
+    return `<li class="mov${x.anulado?" anulado":""}"><div><div class="mov-desc">${h(descMov(x))}</div><div class="mov-meta"><span>${dataCurta(x.data)}${x.moradorNome&&x.tipo!=="renda"?" · "+h(x.moradorNome):""}</span>${x.fotos&&x.fotos.length?"<span>· com talão</span>":""}${x.anulado?'<span class="chip bad">anulado</span>':""}</div></div><div class="mov-val${ent?" in":""}">${ent?"+":""}${eur(x.cent)}</div>${acts}</li>`;
   }
   const meta=[];
   meta.push(dataCurta(x.data));
@@ -620,7 +629,7 @@ function linhaMov(x,opts){
   let acts="";
   const c=S.confirm;
   if(c&&c.id===x.id){
-    acts=`<div class="confirm">${c.act==="anular"?"Anular este registo? Continua visível, riscado, e deixa de contar.":"Dar "+eur(x.cent)+" em dinheiro do fundo a "+h(x.moradorNome||"esta pessoa")+"? Deixa de ser descontado na renda de "+nomeMes(x.mes).toLowerCase()+"."}
+    acts=`<div class="confirm">${c.act==="anular"?textoAnular(x):"Dar "+eur(x.cent)+" em dinheiro do fundo a "+h(x.moradorNome||"esta pessoa")+"? Deixa de ser descontado na renda de "+nomeMes(x.mes).toLowerCase()+"."}
       <button class="btn small ${c.act==="anular"?"danger":"primary"}" data-act="conf-sim">${c.act==="anular"?"Sim, anular":"Sim, pagar em dinheiro"}</button>
       <button class="btn small" data-act="conf-nao">Cancelar</button></div>`;
   }else if(S.canWrite&&!x.anulado){
