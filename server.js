@@ -239,7 +239,8 @@ function novoMovimento(b, req) {
   const m = { tipo, mes: b.mes, data: b.data, cent: b.cent, descricao: txt(b.descricao, 200) };
   const meio = b.meio === "dinheiro" ? "dinheiro" : "conta";
   if (tipo === "compra" || tipo === "conta") {
-    m.pagoPor = b.pagoPor === "fundo" ? "fundo" : "bolso";
+    // "sociais": compra que só conta para o plafond; o dinheiro sai quando se paga a conta dos sociais
+    m.pagoPor = b.pagoPor === "fundo" ? "fundo" : b.pagoPor === "sociais" && tipo === "compra" ? "sociais" : "bolso";
     if (m.pagoPor === "fundo") m.meio = meio;
     m.reembolsado = false;
     const quem = pessoaPorId(b.morador);
@@ -550,7 +551,7 @@ app.post("/api/importar", soTesoureiro, express.json({ limit: "80mb" }), (req, r
     if (!reMes.test(m.mes || "") || !reData.test(m.data || "")) falha(400, "Registo com data inválida no ficheiro.");
     const o = { tipo: m.tipo, mes: m.mes, data: m.data, cent: m.cent, descricao: txt(m.descricao, 200) };
     if (m.tipo === "compra" || m.tipo === "conta") {
-      o.pagoPor = m.pagoPor === "bolso" ? "bolso" : "fundo";
+      o.pagoPor = m.pagoPor === "bolso" ? "bolso" : m.pagoPor === "sociais" && m.tipo === "compra" ? "sociais" : "fundo";
       o.reembolsado = !!m.reembolsado;
       if (o.reembolsado) o.reembolsadoEm = txt(m.reembolsadoEm, 40);
     }

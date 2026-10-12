@@ -619,7 +619,8 @@ function linhaMov(x,opts){
   let chip="";
   if(x.tipo==="compra"||x.tipo==="conta"){
     if(x.pagoPor==="fundo")meta.push("pago com o fundo ("+(meioDe(x)==="dinheiro"?"dinheiro":"conta")+")");
-    else chip=x.reembolsado?`<span class="chip good">pago em dinheiro a ${h(x.moradorNome||"?")}</span>`:`<span class="chip warn">descontado na renda de ${nomeMesCurto(x.mes)} de ${h(x.moradorNome||"?")}</span>`;
+    else if(x.pagoPor==="sociais")chip=`<span class="chip neutral">sociais · só no plafond, paga-se no fim do mês</span>`;
+    else if(x.pagoPor==="bolso")chip=x.reembolsado?`<span class="chip good">pago em dinheiro a ${h(x.moradorNome||"?")}</span>`:`<span class="chip warn">descontado na renda de ${nomeMesCurto(x.mes)} de ${h(x.moradorNome||"?")}</span>`;
   }
   if(x.tipo==="fundo")meta.push(x.sentido==="transferencia"?(x.de==="conta"?"conta → dinheiro":"dinheiro → conta"):(x.sentido==="entrada"?"entrada":"saída")+(meioDe(x)==="dinheiro"?" em dinheiro":" na conta"));
   if(x.tipo==="renda")meta.push(meioDe(x)==="dinheiro"?"em dinheiro":"por transferência");
@@ -671,13 +672,14 @@ function tResumo(){
   else if(st.plafond&&m<hojeMes())ritmo=resta>=0?"mês fechado dentro do plafond":"mês fechado acima do plafond";
   const rf=S.resumoForm;
   const botoes=S.canWrite?`<div class="hero-acoes">
-      <button class="btn primary grande" data-act="resumo-form" data-f="compra" aria-pressed="${rf==="compra"}">+ Registar compra</button>
+      <button class="btn primary grande" data-act="resumo-form" data-f="compra" aria-pressed="${rf==="compra"&&!S.preset}">+ Registar compra</button>
+      <button class="btn grande" data-act="resumo-form" data-f="compra" data-preset="sociais" aria-pressed="${rf==="compra"&&S.preset==="sociais"}">+ Sociais da semana</button>
       ${gere()?`<button class="btn grande" data-act="resumo-form" data-f="conta" aria-pressed="${rf==="conta"}">+ Registar conta</button>`:""}</div>`:"";
   const hero=`<div class="card hero">
     <div class="eyebrow">Plafond de compras · ${nomeMes(m)}</div>
     ${st.plafond?`<div class="big${resta<0?" over":""}">${eur(Math.abs(resta))}<small>${resta>=0?"ainda por gastar":"acima do plafond"}</small></div>
     <div class="bar" role="img" aria-label="Gasto ${Math.round(pct*100)}% do plafond"><div class="fill ${cls}" style="width:${Math.min(100,pct*100).toFixed(1)}%"></div>${atual?`<div class="pace" style="left:calc(${(pace*100).toFixed(1)}% - 1px)" title="A linha fina marca onde devíamos ir hoje"></div>`:""}</div>
-    <div class="bar-legend"><span>Gasto <b>${eur(st.compras)}</b> de ${eur(st.plafond)}</span>${ritmo?`<span>${ritmo}</span>`:""}</div>`
+    <div class="bar-legend"><span>Gasto <b>${eur(st.compras)}</b> de ${eur(st.plafond)}${(()=>{const so=sum(vis.filter(x=>x.tipo==="compra"&&x.mes===m&&x.pagoPor==="sociais"));return so?` · inclui ${eur(so)} de sociais`:""})()}</span>${ritmo?`<span>${ritmo}</span>`:""}</div>`
     :`<div class="big">${eur(st.compras)}<small>gastos em compras</small></div><div class="hint">Ainda não há plafond definido.${gere()?' <button class="linkbtn" data-act="tab" data-t="definicoes">Definir plafond</button>':""}</div>`}
     ${botoes}</div>`;
   const formAberto=rf==="compra"?formCompra(true):rf==="conta"?formConta(true):"";
@@ -840,7 +842,7 @@ function formCompra(noResumo){
       <label class="fld"><span>Valor (€)</span><input id="f-c-valor" inputmode="decimal" placeholder="0,00" required></label>
       <label class="fld"><span>Data</span><input id="f-c-data" type="date" value="${dataDefault()}" required></label>
       <label class="fld"><span>Quem comprou</span><select id="f-c-quem">${optsMoradores(m,true)}</select></label>
-      <label class="fld"><span>Pago com</span><select id="f-c-pago"><option value="bolso" selected>Do meu bolso (desconta na minha renda)</option><option value="fundo-dinheiro">Fundo de maneio, em dinheiro</option><option value="fundo-conta">Fundo de maneio, pela conta (cartão/transferência)</option></select></label>
+      <label class="fld"><span>Pago com</span><select id="f-c-pago"><option value="bolso" selected>Do meu bolso (desconta na minha renda)</option><option value="fundo-dinheiro">Fundo de maneio, em dinheiro</option><option value="fundo-conta">Fundo de maneio, pela conta (cartão/transferência)</option><option value="sociais">Sociais (só conta para o plafond; paga-se no fim do mês)</option></select></label>
       ${blocoFotos("c")}
     </div>
     <div class="form-foot">${btnGuardar("Guardar compra")}${noResumo?'<button type="button" class="btn" data-act="resumo-fechar">Cancelar</button>':""}<span class="hint">Conta para o plafond do mês da data.</span></div></form>`;
@@ -1307,11 +1309,11 @@ const handlers={
   async compra(){
     const cent=parseValor(val("f-c-valor"));if(!cent)return toast("err","Escreve o valor, por exemplo 12,50");
     const data=val("f-c-data");if(!data)return toast("err","Escolhe a data da compra");
-    const quem=val("f-c-quem"),pv=val("f-c-pago"),pago=pv==="bolso"?"bolso":"fundo",meio=pv==="fundo-conta"?"conta":"dinheiro";
+    const quem=val("f-c-quem"),pv=val("f-c-pago"),pago=pv==="bolso"?"bolso":pv==="sociais"?"sociais":"fundo",meio=pv==="fundo-conta"?"conta":"dinheiro";
     if(pago==="bolso"&&!quem)return toast("err","Diz quem pagou do bolso, para se saber a quem reembolsar");
     const fotos=await fotosDoForm("c");if(fotos===null)return;
     const ok=await addMov({tipo:"compra",mes:data.slice(0,7),data,cent,descricao:val("f-c-desc").trim(),morador:quem,moradorNome:nomeMorador(quem),pagoPor:pago,meio,reembolsado:false,fotos});
-    if(ok){limparFotos("c");S.resumoForm=null;S.reset="f-c-";toast("ok",data.slice(0,7)===S.mes?"Compra guardada":"Compra guardada em "+nomeMes(data.slice(0,7)))}
+    if(ok){limparFotos("c");S.resumoForm=null;S.reset="f-c-";toast("ok",(pago==="sociais"?"Sociais registados (só no plafond)":"Compra guardada")+(data.slice(0,7)===S.mes?"":" em "+nomeMes(data.slice(0,7))))}
   },
   async conta(){
     const cent=parseValor(val("f-k-valor"));if(!cent)return toast("err","Escreve o valor, por exemplo 38,20");
@@ -1474,8 +1476,8 @@ document.addEventListener("click",async e=>{
   if(a==="foto-tirar"){const l=S.fotos[b.dataset.alvo],i=+b.dataset.i;if(l&&l[i]){try{URL.revokeObjectURL(l[i].url)}catch(e){}l.splice(i,1)}return render()}
   if(a==="foto-ver"){S.verFoto=b.dataset.src;return render()}
   if(a==="foto-fechar"){S.verFoto=null;return render()}
-  if(a==="resumo-form"){const f=b.dataset.f;if(f==="conta"&&!gere())return semPermissao();S.resumoForm=S.resumoForm===f?null:f;S.reset=f==="compra"?"f-c-":"f-k-";render();const el=document.getElementById(f==="compra"?"f-c-desc":"f-k-valor");if(el&&S.resumoForm)el.focus();return}
-  if(a==="resumo-fechar"){S.resumoForm=null;return render()}
+  if(a==="resumo-form"){const f=b.dataset.f,pre=b.dataset.preset||null;if(f==="conta"&&!gere())return semPermissao();S.resumoForm=S.resumoForm===f&&S.preset===pre?null:f;S.preset=S.resumoForm?pre:null;S.reset=f==="compra"?"f-c-":"f-k-";render();if(S.preset==="sociais"){const pg=document.getElementById("f-c-pago"),ds=document.getElementById("f-c-desc");if(pg)pg.value="sociais";if(ds&&!ds.value)ds.value="Sociais da semana"}const el=document.getElementById(f==="compra"?(S.preset==="sociais"?"f-c-valor":"f-c-desc"):"f-k-valor");if(el&&S.resumoForm)el.focus();return}
+  if(a==="resumo-fechar"){S.resumoForm=null;S.preset=null;return render()}
   if(a==="anular"||a==="reemb"||a==="desp-rm"){S.confirm={act:a,id};return render()}
   if(a==="conf-nao"){S.confirm=null;return render()}
   if(a==="conf-sim"){
@@ -1544,7 +1546,7 @@ async function exportar(q){
   const itens=allMovs().filter(x=>q==="tudo"||x.mes===S.mes).sort((a,b)=>-ordem(a,b));
   const linhas=[["Data","Mês","Tipo","Descrição","Pessoa","Pago com","Conta ou dinheiro","Entrada","Saída","Efeito no fundo","Estado"].join(";")];
   itens.forEach(x=>{const ent=x.tipo==="renda"||(x.tipo==="fundo"&&x.sentido==="entrada");
-    const pago=x.tipo==="compra"||x.tipo==="conta"?(x.pagoPor==="fundo"?"fundo":"bolso"+(x.reembolsado?" (pago em dinheiro)":" (descontado na renda de "+nomeMes(x.mes).toLowerCase()+")")):"";
+    const pago=x.tipo==="compra"||x.tipo==="conta"?(x.pagoPor==="fundo"?"fundo":x.pagoPor==="sociais"?"sociais (só plafond)":"bolso"+(x.reembolsado?" (pago em dinheiro)":" (descontado na renda de "+nomeMes(x.mes).toLowerCase()+")")):"";
     const onde=x.tipo==="fundo"&&x.sentido==="transferencia"?(x.de==="conta"?"conta → dinheiro":"dinheiro → conta"):temMeio(x)?meioDe(x):eBolso(x)&&x.reembolsado?"dinheiro":"";
     linhas.push([x.data,x.mes,{compra:"Compra",conta:"Conta",renda:"Renda",fundo:"Fundo"}[x.tipo],descMov(x),x.moradorNome||"",pago,onde,ent?eurNum(x.cent):"",ent?"":eurNum(x.cent),eurNum(efeito(x)),x.anulado?"anulado":"válido"].map(cel).join(";"))});
   const nome=(q==="tudo"?"caixa-da-casa-tudo":"caixa-da-casa-"+S.mes)+".csv";

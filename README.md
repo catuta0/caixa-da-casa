@@ -7,6 +7,7 @@ Livro de caixa para casas comunitárias e associações. Toda a gente vê as con
 - **Rendas**: a renda do mês é dividida por moradores, comensais e meios comensais. Cada pessoa vê logo quanto tem de pagar, quanto já pagou e o que vem de meses anteriores.
 - **Calculadora da renda**: prevês cada despesa (renda ao senhorio, água, luz, gás, internet, comida…) e a app soma e divide. Podes escolher que despesas os comensais pagam, dar valores fixos e acertar à mão a parte de alguém.
 - **Simulação** (separador próprio): experimenta sem gravar nada. Mexe nos gastos previstos (mudar valores, juntar gastos novos, escolher o que os comensais pagam), junta receitas mensais ou anuais que abatem na renda, e muda o valor de qualquer pessoa: com «ajustar automaticamente» os outros acompanham sem mudar o total; sem isso, vês quanto sobra ou falta. O tesoureiro pode aplicar o resultado ao mês.
+- **Sociais**: compras que se vão fazendo e só se pagam no fim do mês (com uma conta). Registam-se com «+ Sociais da semana» ou «Pago com: Sociais»: contam para o plafond do mês e da semana, mas não mexem no fundo nem descontam na renda de ninguém. O dinheiro sai quando se regista a conta dos sociais.
 - **Compras pagas do próprio bolso**: são descontadas logo na renda de quem pagou (ou pagas em dinheiro pelo tesoureiro, se a pessoa precisar).
 - **Fotos dos talões** em cada compra ou conta.
 - **Fundo de maneio**: livro de caixa com entradas, saídas e saldo, mês a mês, separado entre o que está na conta e o que está em dinheiro.
