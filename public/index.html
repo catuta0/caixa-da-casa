@@ -315,6 +315,22 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}
 .sim-estado{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:10px;font-size:14px}
 .pags{display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-top:2px}
 .pags .linkbtn.mini{color:var(--bad);padding:0}
+.areas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.area{display:grid;gap:1px;text-align:left;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.area b{font-family:var(--f-display);font-size:17px}
+.area span{font-size:12.5px;color:var(--muted)}
+.area.on{background:#2A4F86;border-color:#2A4F86;color:#fff}
+.area.on span{color:#fff;opacity:.85}
+.area.pz-area.on{background:#A24B22;border-color:#A24B22}
+.pz{--accent:#A24B22;--accent-ink:#FFFFFF;--accent-soft:#F7E7DD}
+@media (prefers-color-scheme: dark){.pz{--accent:#F0A36E;--accent-ink:#2A1407;--accent-soft:#3A2416}.area.on{background:#8FB1E8;border-color:#8FB1E8;color:#0D1829}.area.on span{color:#0D1829}.area.pz-area.on{background:#F0A36E;border-color:#F0A36E;color:#2A1407}.area.pz-area.on span{color:#2A1407}}
+.eventos{display:grid;gap:8px}
+.evento{display:flex;justify-content:space-between;align-items:center;gap:8px 16px;flex-wrap:wrap;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);color:var(--ink);cursor:pointer}
+.evento:hover{border-color:var(--accent)}
+.evento>div{display:grid;gap:2px}
+.evento-num{text-align:right;justify-items:end}
+.evento-num b{font-family:var(--f-display);font-size:18px}
+@media (max-width:640px){.areas{margin-bottom:10px}.area{padding:8px 10px}.area span{font-size:11.5px}}
 .breakdown{display:grid;gap:6px;margin-top:6px}
 .breakdown div{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.bar .fill{transition:width .4s ease}}
@@ -358,8 +374,9 @@ const sum=a=>a.reduce((t,x)=>t+(x.cent||0),0);
 
 const S={me:null,autor:null,pub:null,vista:null,tesoureiros:[],editMorador:null,canWrite:true,loading:true,saving:false,
   config:Object.assign({},DEF),moradores:[],movs:{},mes:hojeMes(),tab:"resumo",
-  confirm:null,rendaEdit:null,ajusteEdit:null,eu:null,tes:false,detAberto:false,filtro:"tudo",verTodos:false,fotos:{c:[],k:[]},anexoAlvo:null,verFoto:null,resumoForm:null,editMembro:null,names:{},fresh:true,reset:null};
+  confirm:null,rendaEdit:null,ajusteEdit:null,eu:null,tes:false,detAberto:false,filtro:"tudo",verTodos:false,fotos:{c:[],k:[],p:[]},area:"financas",pz:[],pzEventos:[],pzForm:null,pzFormEvento:null,pzEvento:null,pzFiltro:"tudo",anexoAlvo:null,verFoto:null,resumoForm:null,editMembro:null,names:{},fresh:true,reset:null};
 try{S.eu=localStorage.getItem("caixa-eu")||null}catch(e){}
+try{if(localStorage.getItem("caixa-area")==="pozinho"){S.area="pozinho";S.tab="pz-resumo"}}catch(e){}
 const app=document.getElementById("app");
 
 /* ---------- derived data ---------- */
@@ -544,6 +561,7 @@ function porReembolsar(){
 /* ---------- rendering ---------- */
 function schedule(){if(!schedule.q){schedule.q=true;const f=()=>{if(!schedule.q)return;schedule.q=false;render()};requestAnimationFrame(f);setTimeout(f,150)}}
 function render(){
+  app.classList.toggle("pz",S.area==="pozinho");
   for(const k in _q)delete _q[k];
   const vals={};
   if(!S.fresh)app.querySelectorAll('[id^="f-"]').forEach(el=>{if(S.reset&&el.id.startsWith(S.reset))return;if(S.reset2&&el.id.startsWith(S.reset2))return;vals[el.id]=el.type==="checkbox"?el.checked:el.value});
@@ -569,21 +587,22 @@ function rotularTabelas(){
 
 function page(){
   if(S.vista==="entrar")return vistaEntrar();
-  const c=S.config,atual=S.mes===hojeMes();
-  let out=`<header class="top">
-    <div class="brand"><div class="eyebrow">Livro de caixa da casa</div><h1>${h(c.nome||DEF.nome)}</h1>
+  const c=S.config,atual=S.mes===hojeMes(),pz=S.area==="pozinho",tabs=pz?TABS_PZ:TABS,inicio=pz?"pz-resumo":"resumo";
+  let out=`<div class="areas" role="tablist" aria-label="Área"><button class="area${pz?"":" on"}" role="tab" aria-selected="${!pz}" data-act="area" data-a="financas"><b>Finanças</b><span>rendas, contas e comida</span></button><button class="area pz-area${pz?" on":""}" role="tab" aria-selected="${pz}" data-act="area" data-a="pozinho"><b>Pozinho</b><span>atividades, eventos e coisas da casa</span></button></div>
+  <header class="top">
+    <div class="brand"><div class="eyebrow">${pz?"Pozinho · separado das finanças":"Finanças da casa"}</div><h1>${h(c.nome||DEF.nome)}</h1>
       ${S.me?`<div class="quem">${avatar(S.me,"sm")}<span>${h(S.me.nome)}</span><span class="chip ${S.tes?"good":"warn"}">${S.tes?"tesoureiro":"à espera de aprovação"}</span><button class="linkbtn" data-act="sair">Sair</button></div>`
         :'<div class="quem"><button class="linkbtn" data-act="entrar">Entrar como tesoureiro</button></div>'}</div>
-    <div class="monthnav">
+    ${pz?"":`<div class="monthnav">
       <button class="iconbtn" data-act="mes" data-n="-1" aria-label="Mês anterior">‹</button>
       <div class="mlabel">${nomeMes(S.mes)}</div>
       <button class="iconbtn" data-act="mes" data-n="1" aria-label="Mês seguinte">›</button>
       ${atual?"":'<button class="linkbtn" data-act="hoje">Ir para este mês</button>'}
-    </div></header>
-  <nav class="tabs" role="tablist">${TABS.map(([k,l,c],i)=>`${i===3?'<span class="tab-sep" aria-hidden="true"></span>':""}<button class="tab${i>=3?" sec":""}" role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}"><span class="l-long">${l}</span><span class="l-short">${c}</span></button>`).join("")}</nav>`;
+    </div>`}</header>
+  <nav class="tabs" role="tablist">${tabs.map(([k,l,c],i)=>`${!pz&&i===3?'<span class="tab-sep" aria-hidden="true"></span>':""}<button class="tab${!pz&&i>=3?" sec":""}" role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}"><span class="l-long">${l}</span><span class="l-short">${c}</span></button>`).join("")}</nav>`;
   if(S.me&&!S.tes)out+=`<div class="banner warn">Pediste para ser tesoureiro. Quando outro tesoureiro te aprovar, ficas a poder gerir tudo. Entretanto podes ver as contas e registar compras como toda a gente.</div>`;
-  if(S.tab!=="resumo")out+=`<button class="linkbtn voltar" data-act="tab" data-t="resumo">← Voltar ao resumo</button>`;
-  const fn={resumo:tResumo,rendas:tRendas,simulacao:tSimulacao,fundo:tFundo,historico:tHistorico,definicoes:tDefinicoes}[S.tab];
+  if(S.tab!==inicio)out+=`<button class="linkbtn voltar" data-act="tab" data-t="${inicio}">← Voltar ao resumo</button>`;
+  const fn={"pz-resumo":tPzResumo,"pz-eventos":tPzEventos,"pz-registos":tPzRegistos,resumo:tResumo,rendas:tRendas,simulacao:tSimulacao,fundo:tFundo,historico:tHistorico,definicoes:tDefinicoes}[S.tab];
   return out+`<main class="stack">${fn()}</main>`+(S.verFoto?`<div class="lightbox" data-act="foto-fechar" role="dialog" aria-label="Talão"><img src="${h(S.verFoto)}" alt="Foto do talão"><button class="btn" data-act="foto-fechar">Fechar</button></div>`:"");
 }
 
@@ -865,11 +884,11 @@ function formConta(noResumo){
 
 /* ---------- tesoureiros: só eles mexem em rendas, fundo e definições; toda a gente vê e regista compras e contas ---------- */
 const gere=()=>S.canWrite&&S.tes;
-const SO_TES_FORMS=["conta","ajuste","renda","renda-total","previsao","fundo","config","morador","morador-edit"];
-const SO_TES_ACTS=["arred-mes","ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir","morador-editar","apagar-morador","tes-aprovar","tes-recusar","tes-retirar"];
+const SO_TES_FORMS=["pz-config","pz-evento-novo","conta","ajuste","renda","renda-total","previsao","fundo","config","morador","morador-edit"];
+const SO_TES_ACTS=["pz-devolver","pz-meio","pz-evento-apagar","arred-mes","ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir","morador-editar","apagar-morador","tes-aprovar","tes-recusar","tes-retirar"];
 const semPermissao=()=>toast("err","Só os tesoureiros podem fazer isto.");
 const eMeu=x=>S.canWrite&&!!S.autor&&x.criadoPor===S.autor;
-const podeAnular=x=>gere()||(eMeu(x)&&x.tipo==="compra");
+const podeAnular=x=>gere()||(eMeu(x)&&(x.tipo==="compra"||x.tipo==="pz-despesa"));
 document.addEventListener("toggle",e=>{if(e.target.id==="det-prev")S.detAberto=e.target.open},true);
 
 /* calculadora da renda: previsão de cada conta + plafond, somada e dividida pelos moradores */
@@ -1085,6 +1104,193 @@ async function aplicarSim(){
   const p={previsaoMes,rendaMes,divisaoMes,ajustesMes:aj,receitas,despesas:lista,comensalLinhas:s.linhasCom.slice(),arredondarRenda:!!s.arred,anoInicio:S.config.anoInicio||+hojeMes().slice(0,4)};
   if(v.plafond!=null&&v.plafond!==plafondDe(m)){const pm=Object.assign({},S.config.plafondMes||{});pm[m]=v.plafond;p.plafondMes=pm}
   if(await gravar(()=>guardarConfig(p))){S.sim=null;toast("ok","Simulação aplicada a "+nomeMes(m).toLowerCase())}
+}
+
+/* ---------- POZINHO: atividades, eventos, obras e equipamento da casa (contas separadas das finanças) ---------- */
+const TABS_PZ=[["pz-resumo","Resumo","Resumo"],["pz-eventos","Eventos","Eventos"],["pz-registos","Registos","Registos"]];
+const CAT_PZ={casa:"Casa",obras:"Obras",eletrodomesticos:"Eletrodomésticos",evento:"Despesa do evento",barris:"Barris de cerveja",outros:"Outros"};
+const pzCfg=()=>Object.assign({inicialDinheiro:0,inicialConta:0,barrisInicial:0,precoBarril:0},S.config.pozinho||{});
+const pzVivos=()=>S.pz.filter(x=>!x.anulado);
+const todosMovs=()=>allMovs().concat(S.pz);
+const nBarris=n=>`${n} ${Math.abs(n)===1?"barril":"barris"}`;
+/* saldo do pozinho: dinheiro, conta e barris (os barris que sobram contam como dinheiro, ao preço definido) */
+function pzSaldo(){
+  const c=pzCfg();let din=c.inicialDinheiro||0,conta=c.inicialConta||0,barris=c.barrisInicial||0,devolver=0;
+  pzVivos().forEach(x=>{
+    if(x.tipo==="pz-despesa"){
+      if(x.pagoPor==="bolso"){if(x.reembolsado){if(x.meioDevolucao==="conta")conta-=x.cent;else din-=x.cent}else devolver+=x.cent}
+      else if(x.pagoPor==="conta")conta-=x.cent;else din-=x.cent;
+      barris+=x.barris||0;
+    }else if(x.tipo==="pz-receita"){if(x.meio==="conta")conta+=x.cent;else din+=x.cent}
+    else if(x.tipo==="pz-barris")barris+=x.qtd;
+    else if(x.tipo==="pz-transf"){if(x.de==="conta"){conta-=x.cent;din+=x.cent}else{din-=x.cent;conta+=x.cent}}
+  });
+  const valorBarris=Math.round(barris*(c.precoBarril||0));
+  return {din,conta,barris,valorBarris,devolver,total:din+conta+valorBarris};
+}
+/* resultado de um evento: receitas − despesas − barris usados × preço (barris comprados ficam em stock) */
+function pzResultado(id){
+  const ls=pzVivos().filter(x=>x.evento===id),c=pzCfg();
+  const receitas=ls.filter(x=>x.tipo==="pz-receita").reduce((t,x)=>t+x.cent,0);
+  const despesas=ls.filter(x=>x.tipo==="pz-despesa"&&x.categoria!=="barris").reduce((t,x)=>t+x.cent,0);
+  const usados=-ls.filter(x=>x.tipo==="pz-barris"&&x.qtd<0).reduce((t,x)=>t+x.qtd,0);
+  const custoCerveja=Math.round(usados*(c.precoBarril||0));
+  return {receitas,despesas,usados,custoCerveja,resultado:receitas-despesas-custoCerveja};
+}
+function descPz(x){
+  if(x.tipo==="pz-barris")return (x.qtd<0?nBarris(-x.qtd)+" usados":nBarris(x.qtd)+" a mais")+(x.descricao?" — "+x.descricao:"");
+  if(x.tipo==="pz-transf")return x.descricao||(x.de==="conta"?"Levantamento da conta":"Depósito na conta");
+  return x.descricao||(x.tipo==="pz-receita"?"Receita":"Despesa");
+}
+const podePzFotos=x=>x.tipo==="pz-despesa"&&(gere()||eMeu(x));
+function linhaPz(x,curta){
+  const ev=x.evento&&S.pzEventos.find(e=>e.id===x.evento),meta=[dataCurta(x.data)];
+  if(x.tipo==="pz-despesa"){meta.push(CAT_PZ[x.categoria]||"Despesa");if(x.barris)meta.push("+"+nBarris(x.barris));if(x.pagoPor!=="bolso")meta.push(x.pagoPor==="conta"?"pago pela conta":"pago em dinheiro")}
+  if(x.tipo==="pz-receita")meta.push(x.meio==="conta"?"entrou na conta":"entrou em dinheiro");
+  if(x.tipo==="pz-transf")meta.push(x.de==="conta"?"conta → dinheiro":"dinheiro → conta");
+  if(ev&&S.pzEvento!==ev.id)meta.push("evento: "+h(ev.nome));
+  const quem=x.criadoPor&&S.names[x.criadoPor];if(quem&&!curta)meta.push("registado por "+h(quem));
+  let chip="";
+  if(x.tipo==="pz-despesa"&&x.pagoPor==="bolso")chip=x.reembolsado?`<span class="chip good">devolvido a ${h(x.moradorNome||"?")} (${x.meioDevolucao==="conta"?"conta":"dinheiro"})</span>`:`<span class="chip warn">a devolver a ${h(x.moradorNome||"?")}</span>`;
+  if(x.anulado)chip+='<span class="chip bad">anulado</span>';
+  const entra=x.tipo==="pz-receita"||(x.tipo==="pz-barris"&&x.qtd>0);
+  const valor=x.tipo==="pz-barris"?`${x.qtd>0?"+":"−"}${nBarris(Math.abs(x.qtd))}`:(x.tipo==="pz-transf"?"↔ ":entra?"+":"")+eur(x.cent);
+  let acts="";const c=S.confirm;
+  if(c&&c.id===x.id&&(c.act==="anular"||c.act==="pz-devolver")){
+    acts=`<div class="confirm">${c.act==="anular"?"Anular este registo? Continua visível, riscado, e deixa de contar.":`Devolver ${eur(x.cent)} a ${h(x.moradorNome||"esta pessoa")} ${c.meio==="conta"?"pela conta":"em dinheiro"}?`}
+      <button class="btn small ${c.act==="anular"?"danger":"primary"}" data-act="conf-sim">${c.act==="anular"?"Sim, anular":"Sim, devolver"}</button><button class="btn small" data-act="conf-nao">Cancelar</button></div>`;
+  }else if(!x.anulado){
+    if(gere()&&x.tipo==="pz-despesa"&&x.pagoPor==="bolso"&&!x.reembolsado)acts+=`<button class="btn small" data-act="pz-devolver" data-id="${x.id}" data-meio="dinheiro">Devolver em dinheiro</button><button class="btn small" data-act="pz-devolver" data-id="${x.id}" data-meio="conta">Devolver pela conta</button>`;
+    if(!curta&&podePzFotos(x))acts+=`<button class="linkbtn" data-act="foto-camara" data-alvo="mov:${x.id}">${x.fotos&&x.fotos.length?"Outra foto do recibo":"Tirar foto do recibo"}</button><button class="linkbtn" data-act="foto-add" data-alvo="mov:${x.id}">Juntar ficheiro</button>`;
+    if(!curta&&gere()&&((x.tipo==="pz-despesa"&&x.pagoPor!=="bolso")||x.tipo==="pz-receita")){const m=x.tipo==="pz-despesa"?x.pagoPor:x.meio;acts+=`<button class="linkbtn" data-act="pz-meio" data-id="${x.id}">${m==="conta"?"Foi em dinheiro":"Foi pela conta"}</button>`}
+    if(podeAnular(x))acts+=`<button class="linkbtn${curta?" mini":""}" data-act="anular" data-id="${x.id}">Anular</button>`;
+  }
+  return `<li class="mov${x.anulado?" anulado":""}"><div><div class="mov-desc">${h(descPz(x))}</div><div class="mov-meta">${meta.map(m=>`<span>${m}</span>`).join("")}${chip}</div>${curta?"":fotosMov(x)}</div>
+    <div class="mov-val${entra?" in":""}">${valor}</div>${acts?`<div class="mov-actions">${acts}</div>`:""}</li>`;
+}
+const listaPz=(xs,vazio,curta)=>xs.length?`<ul class="movs">${xs.map(x=>linhaPz(x,curta)).join("")}</ul>`:`<div class="empty">${vazio}</div>`;
+const ordemPz=(a,b)=>(b.data||"").localeCompare(a.data||"")||(b.criadoEm||"").localeCompare(a.criadoEm||"");
+function optsPessoasPz(){return '<option value="">—</option>'+S.moradores.filter(r=>!r.saida||r.saida>=hojeMes()).sort((a,b)=>a.nome.localeCompare(b.nome,"pt")).map(r=>`<option value="${h(r.id)}"${r.id===S.eu?" selected":""}>${h(r.nome)}</option>`).join("")}
+const optsPagoPz=pre=>[["dinheiro","Dinheiro do pozinho"],["conta","Conta do pozinho (cartão/transferência)"],["bolso","Do meu bolso (o pozinho devolve)"]].map(([v,l])=>`<option value="${v}"${v===pre?" selected":""}>${l}</option>`).join("");
+/* formulários do pozinho: tipo = compra | despesa | barris-comprar | receita | barris-usar | barris-acerto | transf */
+function formPz(tipo,evento){
+  const ev=evento?S.pzEventos.find(e=>e.id===evento):null,data=ev&&ev.data<=hoje()?ev.data:hoje();
+  const titulo={compra:"Compra para a casa",despesa:"Despesa do evento","barris-comprar":"Comprar barris de cerveja",receita:"Receita","barris-usar":"Barris usados","barris-acerto":"Acertar a contagem de barris",transf:"Depósito ou levantamento"}[tipo];
+  const d=`<label class="fld"><span>Data</span><input id="f-z-data" type="date" value="${data}" required></label>`;
+  const valor=l=>`<label class="fld"><span>${l||"Valor (€)"}</span><input id="f-z-valor" inputmode="decimal" placeholder="0,00" required></label>`;
+  let campos="";
+  if(tipo==="compra")campos=`<label class="fld wide"><span>O que se comprou</span><input id="f-z-desc" maxlength="120" placeholder="Ex.: tinta para a sala, frigorífico, parafusos" required></label>${valor()}${d}
+      <label class="fld"><span>Para quê</span><select id="f-z-cat"><option value="casa">Casa</option><option value="obras">Obras</option><option value="eletrodomesticos">Eletrodomésticos</option><option value="outros">Outros</option></select></label>
+      <label class="fld"><span>Pago com</span><select id="f-z-pago">${optsPagoPz(gere()?"dinheiro":"bolso")}</select></label>
+      <label class="fld"><span>Quem comprou</span><select id="f-z-quem">${optsPessoasPz()}</select></label>${blocoFotos("p")}`;
+  if(tipo==="despesa")campos=`<label class="fld wide"><span>O que se comprou ou pagou</span><input id="f-z-desc" maxlength="120" placeholder="Ex.: gelo, copos, som, DJ" required></label>${valor()}${d}
+      <label class="fld"><span>Pago com</span><select id="f-z-pago">${optsPagoPz(gere()?"dinheiro":"bolso")}</select></label>
+      <label class="fld"><span>Quem pagou</span><select id="f-z-quem">${optsPessoasPz()}</select></label>${blocoFotos("p")}`;
+  if(tipo==="barris-comprar")campos=`<label class="fld"><span>Quantos barris</span><input id="f-z-qtd" inputmode="numeric" placeholder="Ex.: 2" required></label>${valor("Valor pago (€)")}${d}
+      <label class="fld"><span>Pago com</span><select id="f-z-pago">${optsPagoPz("dinheiro")}</select></label>
+      <label class="fld"><span>Quem pagou</span><select id="f-z-quem">${optsPessoasPz()}</select></label>
+      <label class="fld wide"><span>Nota (opcional)</span><input id="f-z-desc" maxlength="120" placeholder="Ex.: Super Bock 50 L"></label>${blocoFotos("p")}`;
+  if(tipo==="receita")campos=`<label class="fld wide"><span>De onde veio</span><input id="f-z-desc" maxlength="120" placeholder="Ex.: bar, entradas, rifa, donativo" required></label>${valor()}${d}
+      <label class="fld"><span>Entrou</span><select id="f-z-meio"><option value="dinheiro">Em dinheiro</option><option value="conta">Na conta</option></select></label>`;
+  if(tipo==="barris-usar")campos=`<label class="fld"><span>Quantos barris se usaram</span><input id="f-z-qtd" inputmode="numeric" placeholder="Ex.: 3" required></label>${d}
+      <label class="fld wide"><span>Nota (opcional)</span><input id="f-z-desc" maxlength="120" placeholder="Ex.: 2 cheios e 1 a meio"></label>`;
+  if(tipo==="barris-acerto")campos=`<label class="fld"><span>Barris que há agora (contados)</span><input id="f-z-qtd" inputmode="numeric" placeholder="${pzSaldo().barris}" required></label>${d}
+      <label class="fld wide"><span>Nota (opcional)</span><input id="f-z-desc" maxlength="120" placeholder="Ex.: contagem depois da festa"></label>`;
+  if(tipo==="transf")campos=`<label class="fld"><span>Movimento</span><select id="f-z-de"><option value="dinheiro">Depositar dinheiro na conta</option><option value="conta">Levantar da conta para dinheiro</option></select></label>${valor()}${d}`;
+  return `<form class="card form" data-form="pz" data-kind="${tipo}" data-evento="${h(evento||"")}" autocomplete="off"><h3>${titulo}${ev?" · "+h(ev.nome):""}</h3>
+    <div class="grid">${campos}</div>
+    <div class="form-foot">${btnGuardar("Guardar")}<button type="button" class="btn" data-act="pz-form-fechar">Cancelar</button>${tipo==="barris-acerto"?`<span class="hint">Agora a app conta ${nBarris(pzSaldo().barris)}. A diferença fica registada.</span>`:""}</div></form>`;
+}
+function botoesPz(evento){
+  const b=(k,l,prim)=>`<button class="btn${prim?" primary grande":""}" data-act="pz-form" data-f="${k}" data-evento="${h(evento||"")}" aria-pressed="${S.pzForm===k}">${l}</button>`;
+  if(evento)return `<div class="hero-acoes">${b("despesa","+ Despesa",true)}${gere()?b("receita","+ Receita")+b("barris-usar","Barris usados")+b("barris-comprar","Comprar barris"):""}</div>`;
+  return `<div class="hero-acoes">${b("compra","+ Compra para a casa",true)}${gere()?b("receita","+ Receita")+b("barris-comprar","Comprar barris")+b("barris-acerto","Acertar barris")+b("transf","Depósito / levantamento"):""}</div>`;
+}
+function tPzResumo(){
+  const s=pzSaldo(),c=pzCfg();
+  const hero=`<div class="card hero"><div class="eyebrow">Pozinho · dinheiro total</div>
+    <div class="big${s.total<0?" over":""}">${eur(s.total)}</div>
+    <div class="sim-contas" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <div><span>Em dinheiro</span><b${s.din<0?' style="color:var(--bad)"':""}>${eur(s.din)}</b></div>
+      <div><span>Na conta</span><b${s.conta<0?' style="color:var(--bad)"':""}>${eur(s.conta)}</b></div>
+      <div><span>Em barris</span><b>${eur(s.valorBarris)}</b><span>${nBarris(s.barris)}${c.precoBarril?" × "+eur(c.precoBarril):" · preço por definir"}</span></div></div>
+    ${s.devolver?`<div class="hint">Há <b>${eur(s.devolver)}</b> a devolver a quem pagou do bolso; depois de devolver, ficam ${eur(s.total-s.devolver)}.</div>`:""}
+    ${botoesPz(null)}</div>`;
+  const form=S.pzForm&&!S.pzFormEvento?formPz(S.pzForm,null):"";
+  const pend=pzVivos().filter(x=>x.tipo==="pz-despesa"&&x.pagoPor==="bolso"&&!x.reembolsado).sort(ordemPz);
+  const devolver=pend.length?`<div class="card"><div class="section-head"><h2>A devolver</h2><span class="muted num">${eur(s.devolver)}</span></div><div class="hint">Coisas que alguém pagou do bolso e o pozinho ainda tem de devolver.</div>${listaPz(pend,"")}</div>`:"";
+  const evs=S.pzEventos.slice(0,3).map(e=>{const r=pzResultado(e.id);return `<button class="num-item" data-act="pz-evento-abrir" data-id="${h(e.id)}"><span>${dataCurta(e.data)} · ${h(e.nome)}</span><b${r.resultado<0?' style="color:var(--bad)"':""}>${r.resultado>=0?"+":"−"}${eur(Math.abs(r.resultado))}</b><small>receitas ${eur(r.receitas)} · despesas ${eur(r.despesas+r.custoCerveja)}</small></button>`}).join("");
+  const eventos=`<div class="card numeros"><div class="section-head"><div class="eyebrow">Eventos</div><button class="linkbtn" data-act="tab" data-t="pz-eventos">Ver todos</button></div>${evs?`<div class="nums">${evs}</div>`:`<div class="empty">Ainda não há eventos.${gere()?' <button class="linkbtn" data-act="tab" data-t="pz-eventos">Criar evento</button>':""}</div>`}</div>`;
+  const ult=S.pz.slice().sort(ordemPz).slice(0,6);
+  const registos=`<div class="card"><div class="section-head"><h2>Últimos registos</h2>${S.pz.length>6?`<button class="linkbtn" data-act="tab" data-t="pz-registos">Ver todos (${S.pz.length})</button>`:""}</div>${listaPz(ult,"Ainda não há nada registado no pozinho.",true)}</div>`;
+  const defs=gere()?`<form class="card form" data-form="pz-config" autocomplete="off"><h3>Definições do pozinho</h3>
+    <div class="grid">
+      <label class="fld"><span>Dinheiro que havia ao começar (€)</span><input id="f-zc-din" inputmode="decimal" value="${eurNum(c.inicialDinheiro)}"></label>
+      <label class="fld"><span>Na conta ao começar (€)</span><input id="f-zc-conta" inputmode="decimal" value="${eurNum(c.inicialConta)}"></label>
+      <label class="fld"><span>Barris que havia ao começar</span><input id="f-zc-barris" inputmode="numeric" value="${c.barrisInicial||0}"></label>
+      <label class="fld"><span>Valor de cada barril (€)</span><input id="f-zc-preco" inputmode="decimal" value="${eurNum(c.precoBarril)}"></label>
+    </div>
+    <div class="form-foot">${btnGuardar("Guardar")}<span class="hint">O valor de cada barril serve para contar os barris que sobram como dinheiro e para o custo da cerveja nos eventos.</span></div></form>`:"";
+  return hero+form+devolver+eventos+registos+defs;
+}
+function tPzEventos(){
+  if(S.pzEvento){
+    const e=S.pzEventos.find(x=>x.id===S.pzEvento);
+    if(!e){S.pzEvento=null;return tPzEventos()}
+    const r=pzResultado(e.id),ls=S.pz.filter(x=>x.evento===e.id).sort(ordemPz),c=S.confirm;
+    const apagar=gere()&&!pzVivos().some(x=>x.evento===e.id)?(c&&c.act==="pz-evento-apagar"&&c.id===e.id?`<span class="confirm">Apagar o evento? <button class="btn small danger" data-act="conf-sim">Apagar</button><button class="btn small" data-act="conf-nao">Cancelar</button></span>`:`<button class="linkbtn" data-act="pz-evento-apagar" data-id="${h(e.id)}" style="color:var(--bad)">Apagar evento</button>`):"";
+    return `<button class="linkbtn" data-act="pz-evento-fechar" style="justify-self:start;padding-left:0">← Todos os eventos</button>
+      <div class="card hero"><div class="eyebrow">Evento · ${dataCurta(e.data)} ${e.data.slice(0,4)}</div><h2 style="font-size:24px">${h(e.nome)}</h2>${e.notas?`<div class="hint">${h(e.notas)}</div>`:""}
+        <div class="sim-contas"><div><span>Receitas</span><b style="color:var(--good)">${eur(r.receitas)}</b></div><div><span>Despesas</span><b>${eur(r.despesas)}</b></div>
+          <div><span>Cerveja (${nBarris(r.usados)})</span><b>${eur(r.custoCerveja)}</b></div><div><span>Resultado</span><b style="color:${r.resultado<0?"var(--bad)":"var(--good)"}">${r.resultado>=0?"+":"−"}${eur(Math.abs(r.resultado))}</b></div></div>
+        <div class="hint">Resultado = receitas − despesas − barris usados × ${eur(pzCfg().precoBarril)}. Barris comprados que não se usam ficam em stock e contam no dinheiro do pozinho. Há agora ${nBarris(pzSaldo().barris)} em stock.</div>
+        ${botoesPz(e.id)}${apagar?`<div class="form-foot">${apagar}</div>`:""}</div>
+      ${S.pzForm&&S.pzFormEvento===e.id?formPz(S.pzForm,e.id):""}
+      <div class="card"><h2 style="margin-bottom:6px">Registos do evento</h2>${listaPz(ls,"Ainda não há registos neste evento.")}</div>`;
+  }
+  const novo=gere()?`<form class="card form" data-form="pz-evento-novo" autocomplete="off"><h3>Novo evento</h3><div class="grid">
+      <label class="fld"><span>Nome</span><input id="f-ze-nome" maxlength="80" placeholder="Ex.: Festa de São Martinho" required></label>
+      <label class="fld"><span>Data</span><input id="f-ze-data" type="date" value="${hoje()}" required></label>
+      <label class="fld wide"><span>Notas (opcional)</span><input id="f-ze-notas" maxlength="200"></label></div>
+      <div class="form-foot">${btnGuardar("Criar evento")}</div></form>`:"";
+  const lista=S.pzEventos.map(e=>{const r=pzResultado(e.id);return `<button class="evento" data-act="pz-evento-abrir" data-id="${h(e.id)}"><div><b>${h(e.nome)}</b><span class="muted">${dataCurta(e.data)} ${e.data.slice(0,4)}</span></div>
+      <div class="evento-num"><span class="muted">receitas ${eur(r.receitas)} · despesas ${eur(r.despesas+r.custoCerveja)}${r.usados?" · "+nBarris(r.usados):""}</span><b style="color:${r.resultado<0?"var(--bad)":"var(--good)"}">${r.resultado>=0?"+":"−"}${eur(Math.abs(r.resultado))}</b></div></button>`}).join("");
+  return novo+`<div class="card"><h2 style="margin-bottom:8px">Eventos</h2>${lista?`<div class="eventos">${lista}</div>`:'<div class="empty">Ainda não há eventos.</div>'}</div>`;
+}
+function tPzRegistos(){
+  const F=[["tudo","Tudo"],["pz-despesa","Despesas"],["pz-receita","Receitas"],["pz-barris","Barris"],["pz-transf","Depósitos/levantamentos"]];
+  const f=S.pzFiltro||"tudo",xs=S.pz.filter(x=>f==="tudo"||x.tipo===f).sort(ordemPz);
+  return `<div class="card"><div class="section-head"><h2>Registos do pozinho</h2></div>
+    <div class="filtros" style="margin-bottom:6px">${F.map(([k,l])=>`<button class="filtro" data-act="pz-filtro" data-f="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
+    ${listaPz(xs,"Nada registado.")}</div>`;
+}
+async function guardarPz(form){
+  const tipo=form.dataset.kind,evento=form.dataset.evento||"",data=val("f-z-data")||hoje(),mes=data.slice(0,7),desc=val("f-z-desc").trim();
+  const inteiro=x=>{const n=parseInt(String(x).trim(),10);return Number.isFinite(n)?n:null};
+  let mov;
+  if(tipo==="compra"||tipo==="despesa"||tipo==="barris-comprar"){
+    const cent=parseValor(val("f-z-valor"));if(!cent)return toast("err","Escreve o valor, por exemplo 25,50");
+    if(tipo!=="barris-comprar"&&!desc)return toast("err","Escreve o que se comprou");
+    const pagoPor=val("f-z-pago"),quem=val("f-z-quem");
+    if(pagoPor==="bolso"&&!quem)return toast("err","Diz quem pagou do bolso, para se saber a quem devolver");
+    let barris=0;if(tipo==="barris-comprar"){barris=inteiro(val("f-z-qtd"));if(!barris||barris<1)return toast("err","Escreve quantos barris se compraram")}
+    const fotos=await fotosDoForm("p");if(fotos===null)return;
+    mov={tipo:"pz-despesa",mes,data,cent,descricao:desc||(tipo==="barris-comprar"?"Barris de cerveja":""),categoria:tipo==="barris-comprar"?"barris":tipo==="despesa"?"evento":val("f-z-cat"),pagoPor,morador:quem,evento,fotos};
+    if(barris)mov.barris=barris;
+  }else if(tipo==="receita"){
+    const cent=parseValor(val("f-z-valor"));if(!cent)return toast("err","Escreve o valor");if(!desc)return toast("err","Escreve de onde veio a receita");
+    mov={tipo:"pz-receita",mes,data,cent,descricao:desc,meio:val("f-z-meio"),evento};
+  }else if(tipo==="barris-usar"||tipo==="barris-acerto"){
+    const n=inteiro(val("f-z-qtd"));if(n==null||n<0)return toast("err","Escreve um número de barris");
+    const qtd=tipo==="barris-usar"?-n:n-pzSaldo().barris;
+    if(!qtd)return toast(tipo==="barris-usar"?"err":"ok",tipo==="barris-usar"?"Escreve quantos barris se usaram":"A contagem já bate certo");
+    mov={tipo:"pz-barris",mes,data,qtd,descricao:desc||(tipo==="barris-acerto"?"Acerto de contagem":""),evento};
+  }else if(tipo==="transf"){
+    const cent=parseValor(val("f-z-valor"));if(!cent)return toast("err","Escreve o valor");
+    mov={tipo:"pz-transf",mes,data,cent,de:val("f-z-de")};
+  }
+  if(!mov)return;
+  if(await addMov(mov)){limparFotos("p");S.pzForm=null;S.pzFormEvento=null;S.reset="f-z-";toast("ok","Registo guardado no pozinho")}
 }
 
 /* coluna "Pago": o tesoureiro pode anular cada pagamento ali mesmo */
@@ -1379,6 +1585,17 @@ const handlers={
     const ok=await gravar(()=>guardarConfig(p),()=>Object.assign(S.config,p));
     if(ok){S.reset="f-s-";S.fresh=true;toast("ok","Definições guardadas")}
   },
+  pz(form){return guardarPz(form)},
+  async "pz-evento-novo"(){
+    const nome=val("f-ze-nome").trim(),data=val("f-ze-data");if(!nome)return toast("err","Escreve o nome do evento");if(!data)return toast("err","Escolhe a data");
+    let novo;if(await gravar(async()=>{novo=await api("POST","/api/pz-eventos",{nome,data,notas:val("f-ze-notas").trim()})})){S.reset="f-ze-";S.pzEvento=novo.id;toast("ok","Evento criado")}
+  },
+  async "pz-config"(){
+    const num=id=>{const x=val(id).trim();if(!x||x==="0"||x==="0,00")return 0;return parseValor(x)};
+    const inicialDinheiro=num("f-zc-din"),inicialConta=num("f-zc-conta"),precoBarril=num("f-zc-preco"),barrisInicial=parseInt(val("f-zc-barris")||"0",10);
+    if(inicialDinheiro==null||inicialConta==null||precoBarril==null||!Number.isFinite(barrisInicial)||barrisInicial<0)return toast("err","Verifica os valores (por exemplo 120,50)");
+    if(await gravar(()=>guardarConfig({pozinho:Object.assign({},S.config.pozinho||{},{inicialDinheiro,inicialConta,barrisInicial,precoBarril})}))){S.reset="f-zc-";S.fresh=true;toast("ok","Definições do pozinho guardadas")}
+  },
   "sim-gasto"(){
     const nome=val("sim-novo-nome").trim().replace(/\s+/g," ");if(!nome)return toast("err","Escreve o nome do gasto");
     const x=val("sim-novo-valor").trim(),c=x?parseValor(x):0;if(x&&c==null)return toast("err","Escreve um valor, por exemplo 50");
@@ -1435,7 +1652,7 @@ async function addDespesa(){
   if(await gravar(()=>guardarConfig({despesas:lista}),()=>{S.config.despesas=lista})){S.reset="f-d-";toast("ok","Despesa «"+nome+"» adicionada")}
 }
 /* ---------- clicks ---------- */
-function ir(tab){S.tab=tab;S.confirm=null;S.rendaEdit=null;S.editMorador=null;S.vista=null;S.resumoForm=null;S.verFoto=null;S.fresh=true;render();window.scrollTo({top:0})}
+function ir(tab){S.tab=tab;S.confirm=null;S.pzEvento=null;S.pzForm=null;S.pzFormEvento=null;S.rendaEdit=null;S.editMorador=null;S.vista=null;S.resumoForm=null;S.verFoto=null;S.fresh=true;render();window.scrollTo({top:0})}
 function mudarMes(m){S.mes=m;S.sim=null;S.confirm=null;S.rendaEdit=null;S.ajusteEdit=null;S.fresh=true;render()}
 document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;
@@ -1449,6 +1666,15 @@ document.addEventListener("click",async e=>{
   if(a==="entrar"){S.vista="entrar";S.fresh=true;render();window.scrollTo({top:0});return}
   if(a==="entrar-voltar"){S.vista=null;S.fresh=true;return render()}
   if(a==="eu-mudar")return escolherEu(null);
+  if(a==="area"){S.area=b.dataset.a==="pozinho"?"pozinho":"financas";try{localStorage.setItem("caixa-area",S.area)}catch(e){}S.pzForm=null;S.pzEvento=null;return ir(S.area==="pozinho"?"pz-resumo":"resumo")}
+  if(a==="pz-form"){const f=b.dataset.f,ev=b.dataset.evento||null;S.pzForm=S.pzForm===f&&S.pzFormEvento===ev?null:f;S.pzFormEvento=S.pzForm?ev:null;S.reset="f-z-";render();const el=document.querySelector('form[data-form="pz"] input');if(el)el.focus();return}
+  if(a==="pz-form-fechar"){S.pzForm=null;S.pzFormEvento=null;limparFotos("p");return render()}
+  if(a==="pz-evento-abrir"){S.pzEvento=id;S.pzForm=null;S.tab="pz-eventos";S.fresh=true;render();window.scrollTo({top:0});return}
+  if(a==="pz-evento-fechar"){S.pzEvento=null;S.pzForm=null;return render()}
+  if(a==="pz-filtro"){S.pzFiltro=b.dataset.f;return render()}
+  if(a==="pz-devolver"){S.confirm={act:a,id,meio:b.dataset.meio};return render()}
+  if(a==="pz-evento-apagar"){S.confirm={act:a,id};return render()}
+  if(a==="pz-meio"){const x=S.pz.find(y=>y.id===id);if(x){const atual=x.tipo==="pz-despesa"?x.pagoPor:x.meio,novo=atual==="conta"?"dinheiro":"conta";if(await patchMov(x,{meio:novo}))toast("ok",novo==="conta"?"Passou para a conta":"Passou para dinheiro")}return}
   if(a==="mudar-meio"){if(!gere())return semPermissao();const x=allMovs().find(y=>y.id===id);if(x){const novo=meioDe(x)==="dinheiro"?"conta":"dinheiro";if(await patchMov(x,{meio:novo}))toast("ok",novo==="conta"?"Passou para a conta":"Passou para dinheiro")}return}
   if(a==="sim-repor"){iniciarSim(S.mes);return render()}
   if(a==="sim-repor-pessoas"){recalcSim(true);return render()}
@@ -1484,10 +1710,12 @@ document.addEventListener("click",async e=>{
     const c=S.confirm;S.confirm=null;if(!c)return;
     if(c.act==="desp-rm"){const lista=despesas().map(d=>d.id===c.id?Object.assign({},d,{removida:true}):Object.assign({},d)),d=lista.find(x=>x.id===c.id);
       if(d&&await gravar(()=>guardarConfig({despesas:lista}),()=>{S.config.despesas=lista}))toast("ok","Despesa «"+d.nome+"» removida");return}
+    if(c.act==="pz-evento-apagar"){if(await gravar(()=>api("DELETE","/api/pz-eventos/"+encodeURIComponent(c.id)))){S.pzEvento=null;toast("ok","Evento apagado")}return}
+    if(c.act==="pz-devolver"){const x=S.pz.find(y=>y.id===c.id);if(x&&await patchMov(x,{reembolsado:true,meioDevolucao:c.meio}))toast("ok","Devolvido a "+(x.moradorNome||"quem pagou"));return}
     if(c.act==="apagar-morador"){const r=S.moradores.find(x=>x.id===c.id);if(r&&await gravar(()=>api("DELETE","/api/pessoas/"+encodeURIComponent(r.id))))toast("ok",r.nome+" apagado");return}
     if(c.act==="tes-recusar"){const u=S.tesoureiros.find(x=>x.id===c.id);if(u&&await gravar(()=>api("DELETE","/api/tesoureiros/"+encodeURIComponent(u.id))))toast("ok","Pedido de "+u.nome+" recusado");return}
     if(c.act==="tes-retirar"){const u=S.tesoureiros.find(x=>x.id===c.id);if(u&&await gravar(()=>api("PATCH","/api/tesoureiros/"+encodeURIComponent(u.id),{estado:"bloqueado"}))){toast("ok",u.nome+" deixou de ser tesoureiro");if(S.me&&u.id===S.me.id)setTimeout(()=>location.reload(),900)}return}
-    const x=allMovs().find(y=>y.id===c.id);if(!x)return render();
+    const x=todosMovs().find(y=>y.id===c.id);if(!x)return render();
     if(c.act==="anular"&&!podeAnular(x))return semPermissao();
     if(c.act!=="anular"&&!gere())return semPermissao();
     if(c.act==="anular"){if(await patchMov(x,{anulado:true}))toast("ok","Registo anulado")}
@@ -1520,7 +1748,7 @@ async function anexoEscolhido(e){
   if(bons.length<files.length)toast("err","Só dá para juntar fotos ou PDF.");
   if(!bons.length)return;
   if(alvo.startsWith("mov:")){
-    const x=allMovs().find(y=>y.id===alvo.slice(4));if(!x||S.saving)return;
+    const x=todosMovs().find(y=>y.id===alvo.slice(4));if(!x||S.saving)return;
     S.saving=true;schedule();
     let novas;try{novas=await enviarFotos(bons)}catch(e){erroFoto(e);return}finally{S.saving=false;schedule()}
     if(await patchMov(x,{fotosNovas:novas.map(f=>f.id)}))toast("ok","Talão juntado");
@@ -1565,7 +1793,8 @@ async function carregar(){
   S.names={};S.tesoureiros.forEach(u=>{S.names[u.id]=u.nome});
   if(S.me)S.names[S.me.id]=S.me.nome;
   S.config=Object.assign({},DEF,r.config||{},{_existe:!!(r.config&&Object.keys(r.config).length)});
-  S.movs={todos:r.movimentos||[]};
+  const mv=r.movimentos||[],ePz=m=>String(m.tipo||"").startsWith("pz-");
+  S.movs={todos:mv.filter(m=>!ePz(m))};S.pz=mv.filter(ePz);S.pzEventos=r.pzEventos||[];
   if(S.me&&S.vista==="entrar")S.vista=null;
   document.title=(S.config.nome||DEF.nome)+" · Caixa da Casa";
   schedule();

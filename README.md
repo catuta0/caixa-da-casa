@@ -15,6 +15,18 @@ Livro de caixa para casas comunitárias e associações. Toda a gente vê as con
 - **Sem contas para o dia a dia**: quem tem o link vê tudo e regista compras. Só os **tesoureiros** entram (com a conta Google), e um tesoureiro novo tem de ser aprovado por outro.
 - Funciona bem no telemóvel.
 
+## Pozinho
+
+Além das **Finanças** (rendas, contas e comida), a app tem uma área separada, o **Pozinho**, para atividades, eventos, obras e equipamento da casa. Escolhe-se no topo (**Finanças | Pozinho**); o Pozinho tem cor própria e as contas não se misturam.
+
+- **Dinheiro total do pozinho** = em dinheiro + na conta + em barris (barris em stock × valor de cada barril). Tudo calculado a partir dos registos e dos valores iniciais (Definições do pozinho).
+- **+ Compra para a casa** (obras, eletrodomésticos, casa, outros), com foto do recibo. Pode ser paga em dinheiro do pozinho, pela conta, ou do bolso de alguém (fica «a devolver» até o tesoureiro devolver em dinheiro ou pela conta).
+- **Eventos**: cada evento tem despesas (com fotos), receitas e barris usados, e mostra o resultado: receitas − despesas − barris usados × valor do barril. Barris comprados e não usados ficam em stock e contam como dinheiro.
+- **Barris**: comprar barris (despesa que aumenta o stock), registar barris usados num evento e acertar a contagem.
+- **Depósitos e levantamentos** entre o dinheiro e a conta do pozinho.
+
+Quem tem o link vê tudo e regista compras para a casa e despesas de eventos; receitas, barris, depósitos, eventos e definições do pozinho são dos tesoureiros.
+
 ## Instalação rápida
 
 Com o Docker instalado, o domínio a apontar para o servidor e o ID do Google criado (passos 1 a 3), basta um comando no servidor:

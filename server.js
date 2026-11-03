@@ -68,6 +68,13 @@ db.exec(`
     chave TEXT PRIMARY KEY,
     valor TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS pz_eventos (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    data TEXT NOT NULL,
+    notas TEXT,
+    criado_em TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS fotos (
     id TEXT PRIMARY KEY,
     mime TEXT NOT NULL,
@@ -229,9 +236,47 @@ function fotosValidas(lista) {
   }
   return out;
 }
+/* Pozinho (atividades, eventos, obras e equipamento da casa): contas separadas das finanças.
+   pz-despesa: compra/despesa (qualquer pessoa com o link); pz-receita, pz-barris, pz-transf: tesoureiros. */
+const eventoPorId = id => (typeof id === "string" && id ? db.prepare("SELECT * FROM pz_eventos WHERE id = ?").get(id) : undefined);
+function movimentoPozinho(b, req) {
+  const tes = req.tes, tipo = b.tipo;
+  if (!tes && tipo !== "pz-despesa") falha(403, "Só os tesoureiros podem registar isto.");
+  if (!reMes.test(b.mes || "") || !reData.test(b.data || "")) falha(400, "Data inválida.");
+  const m = { tipo, area: "pozinho", mes: b.mes, data: b.data, descricao: txt(b.descricao, 200) };
+  const ev = eventoPorId(b.evento);
+  if (b.evento && !ev) falha(400, "Esse evento não existe.");
+  m.evento = ev ? ev.id : "";
+  const meio = b.meio === "conta" ? "conta" : "dinheiro";
+  if (tipo === "pz-barris") {
+    if (!Number.isInteger(b.qtd) || !b.qtd || Math.abs(b.qtd) > 1000) falha(400, "Número de barris inválido.");
+    m.qtd = b.qtd;
+  } else {
+    if (!Number.isInteger(b.cent) || b.cent <= 0 || b.cent > 1e9) falha(400, "Valor inválido.");
+    m.cent = b.cent;
+  }
+  if (tipo === "pz-despesa") {
+    m.categoria = ["casa", "obras", "eletrodomesticos", "evento", "barris", "outros"].includes(b.categoria) ? b.categoria : (m.evento ? "evento" : "casa");
+    m.pagoPor = ["dinheiro", "conta", "bolso"].includes(b.pagoPor) ? b.pagoPor : "dinheiro";
+    const quem = pessoaPorId(b.morador);
+    m.morador = quem ? quem.id : ""; m.moradorNome = quem ? quem.nome : txt(b.moradorNome, 80);
+    if (m.pagoPor === "bolso" && !m.moradorNome) falha(400, "Diz quem pagou do bolso, para se saber a quem devolver.");
+    m.reembolsado = false;
+    if (Number.isInteger(b.barris) && b.barris > 0 && b.barris <= 1000) m.barris = b.barris;
+    if (!m.descricao) falha(400, "Escreve o que se comprou.");
+  }
+  if (tipo === "pz-receita") { m.meio = meio; if (!m.descricao) falha(400, "Escreve de onde veio a receita."); }
+  if (tipo === "pz-transf") m.de = b.de === "conta" ? "conta" : "dinheiro";
+  m.fotos = fotosValidas(b.fotos);
+  m.criadoPor = req.autor;
+  m.criadoEm = agora();
+  m.anulado = false;
+  return m;
+}
 function novoMovimento(b, req) {
   const tes = req.tes;
   const tipo = b.tipo;
+  if (["pz-despesa", "pz-receita", "pz-barris", "pz-transf"].includes(tipo)) return movimentoPozinho(b, req);
   if (!["compra", "conta", "renda", "fundo"].includes(tipo)) falha(400, "Tipo de registo inválido.");
   if (!tes && tipo !== "compra") falha(403, "Só os tesoureiros podem registar isto.");
   if (!Number.isInteger(b.cent) || b.cent <= 0 || b.cent > 1e9) falha(400, "Valor inválido.");
@@ -287,7 +332,7 @@ function dadosPessoa(b, parcial) {
 const CHAVES_CONFIG = {
   nome: "string", plafond: "int", fundoInicial: "int", fundoInicialDinheiro: "int", rendasNoFundo: "bool", arredondarRenda: "bool", anoInicio: "intnull",
   plafondMes: "obj", rendaMes: "obj", previsaoMes: "obj", divisaoMes: "obj", ajustesMes: "obj",
-  despesas: "arr", comensalLinhas: "arr", receitas: "arr",
+  despesas: "arr", comensalLinhas: "arr", receitas: "arr", pozinho: "obj",
 };
 function mudancasConfig(b) {
   const out = {};
@@ -394,6 +439,7 @@ app.get("/api/estado", (req, res) => {
     autor: req.autor,
     config: lerConfig() || {},
     pessoas, tesoureiros, movimentos,
+    pzEventos: db.prepare("SELECT id, nome, data, notas FROM pz_eventos ORDER BY data DESC, criado_em DESC").all(),
   });
 });
 
@@ -422,21 +468,29 @@ app.patch("/api/movimentos/:id", limitar("registar", 120, 36e5), (req, res) => {
   const row = db.prepare("SELECT dados FROM movimentos WHERE id = ?").get(req.params.id);
   if (!row) falha(404, "Registo não encontrado.");
   const m = JSON.parse(row.dados), b = req.body || {};
-  const tes = req.tes, minhaCompra = m.criadoPor === req.autor && m.tipo === "compra";
+  const tes = req.tes, minhaCompra = m.criadoPor === req.autor && (m.tipo === "compra" || m.tipo === "pz-despesa");
   if (b.anulado === true) {
     if (!tes && !minhaCompra) falha(403, "Só podes anular as compras que registaste neste aparelho.");
     if (!m.anulado) Object.assign(m, { anulado: true, anuladoPor: req.autor, anuladoEm: agora() });
   }
-  if (b.reembolsado === true) {
+  if (b.reembolsado === true && m.tipo === "pz-despesa") {
+    if (!tes) falha(403, "Só os tesoureiros podem devolver o dinheiro.");
+    if (m.pagoPor !== "bolso") falha(400, "Esta despesa não foi paga do bolso.");
+    if (!m.reembolsado) Object.assign(m, { reembolsado: true, reembolsadoEm: agora(), meioDevolucao: b.meioDevolucao === "conta" ? "conta" : "dinheiro" });
+  } else if (b.reembolsado === true) {
     if (!tes) falha(403, "Só os tesoureiros podem pagar em dinheiro.");
     if (!["compra", "conta"].includes(m.tipo) || m.pagoPor !== "bolso") falha(400, "Este registo não foi pago do bolso.");
     if (!m.reembolsado) Object.assign(m, { reembolsado: true, reembolsadoEm: agora() });
   }
   if (b.meio === "dinheiro" || b.meio === "conta") {
     if (!tes) falha(403, "Só os tesoureiros podem mudar isto.");
-    const temMeio = m.tipo === "renda" || (m.tipo === "fundo" && m.sentido !== "transferencia") || (["compra", "conta"].includes(m.tipo) && m.pagoPor === "fundo");
-    if (!temMeio) falha(400, "Este registo não passa pelo fundo.");
-    m.meio = b.meio;
+    if (m.tipo === "pz-despesa" && m.pagoPor !== "bolso") m.pagoPor = b.meio;
+    else if (m.tipo === "pz-receita") m.meio = b.meio;
+    else {
+      const temMeio = m.tipo === "renda" || (m.tipo === "fundo" && m.sentido !== "transferencia") || (["compra", "conta"].includes(m.tipo) && m.pagoPor === "fundo");
+      if (!temMeio) falha(400, "Este registo não passa pelo fundo.");
+      m.meio = b.meio;
+    }
   }
   if (Array.isArray(b.fotosNovas)) {
     if (!tes && !minhaCompra) falha(403, "Só podes juntar talões às compras que registaste neste aparelho.");
@@ -479,6 +533,35 @@ app.delete("/api/pessoas/:id", soTesoureiro, (req, res) => {
   const usada = db.prepare("SELECT 1 FROM movimentos WHERE json_extract(dados, '$.morador') = ? LIMIT 1").get(p.id);
   if (usada) falha(400, "Esta pessoa já tem registos. Em vez de a apagar, marca o mês em que saiu.");
   db.prepare("DELETE FROM pessoas WHERE id = ?").run(p.id);
+  avisar();
+  res.json({ ok: true });
+});
+
+/* eventos do pozinho: só os tesoureiros criam, mudam ou apagam */
+function dadosEvento(b) {
+  const nome = txt(b && b.nome, 80);
+  if (!nome) falha(400, "Escreve o nome do evento.");
+  if (!reData.test((b && b.data) || "")) falha(400, "Escolhe a data do evento.");
+  return { nome, data: b.data, notas: txt(b.notas, 400) };
+}
+app.post("/api/pz-eventos", soTesoureiro, (req, res) => {
+  const d = dadosEvento(req.body), id = novoId();
+  db.prepare("INSERT INTO pz_eventos (id, nome, data, notas, criado_em) VALUES (?, ?, ?, ?, ?)").run(id, d.nome, d.data, d.notas, agora());
+  avisar();
+  res.status(201).json(Object.assign({ id }, d));
+});
+app.patch("/api/pz-eventos/:id", soTesoureiro, (req, res) => {
+  if (!eventoPorId(req.params.id)) falha(404, "Evento não encontrado.");
+  const d = dadosEvento(req.body);
+  db.prepare("UPDATE pz_eventos SET nome = ?, data = ?, notas = ? WHERE id = ?").run(d.nome, d.data, d.notas, req.params.id);
+  avisar();
+  res.json(Object.assign({ id: req.params.id }, d));
+});
+app.delete("/api/pz-eventos/:id", soTesoureiro, (req, res) => {
+  if (!eventoPorId(req.params.id)) falha(404, "Evento não encontrado.");
+  const usado = db.prepare("SELECT 1 FROM movimentos WHERE json_extract(dados, '$.evento') = ? AND json_extract(dados, '$.anulado') = 0 LIMIT 1").get(req.params.id);
+  if (usado) falha(400, "Este evento tem registos. Anula-os primeiro, ou deixa o evento ficar.");
+  db.prepare("DELETE FROM pz_eventos WHERE id = ?").run(req.params.id);
   avisar();
   res.json({ ok: true });
 });
