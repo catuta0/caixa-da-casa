@@ -25,7 +25,16 @@ Além das **Finanças** (rendas, contas e comida), a app tem uma área separada,
 - **Barris**: comprar barris (despesa que aumenta o stock), registar barris usados num evento e acertar a contagem.
 - **Depósitos e levantamentos** entre o dinheiro e a conta do pozinho.
 
-Quem tem o link vê tudo e regista compras para a casa e despesas de eventos; receitas, barris, depósitos, eventos e definições do pozinho são dos tesoureiros.
+Quem tem o link vê tudo e regista compras para a casa e despesas de eventos; receitas, barris, depósitos, eventos e definições do pozinho são dos **tesoureiros do pozinho**.
+
+### Tesoureiros das finanças e do pozinho
+
+Ao entrar com o Google, cada pessoa escolhe se quer ser tesoureira das **Finanças** ou do **Pozinho**, e fica à espera de aprovação.
+
+- **Tesoureiros das finanças** gerem rendas, contas, fundo, pessoas e definições, e **aprovam tesoureiros das finanças e do pozinho**. Não mexem nas contas do pozinho.
+- **Tesoureiros do pozinho** gerem eventos, receitas, barris, depósitos e definições do pozinho, e **aprovam outros do pozinho**. Não mexem nas finanças.
+- Quem entra primeiro (ou está em `TESOUREIRO_EMAIL`) fica logo tesoureiro das finanças. Tem de ficar sempre pelo menos um tesoureiro das finanças.
+- Registar compras (comida nas finanças; compras para a casa e despesas de eventos no pozinho) continua aberto a toda a gente.
 
 ## Instalação rápida
 

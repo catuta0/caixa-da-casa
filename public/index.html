@@ -591,7 +591,7 @@ function page(){
   let out=`<div class="areas" role="tablist" aria-label="Área"><button class="area${pz?"":" on"}" role="tab" aria-selected="${!pz}" data-act="area" data-a="financas"><b>Finanças</b><span>rendas, contas e comida</span></button><button class="area pz-area${pz?" on":""}" role="tab" aria-selected="${pz}" data-act="area" data-a="pozinho"><b>Pozinho</b><span>atividades, eventos e coisas da casa</span></button></div>
   <header class="top">
     <div class="brand"><div class="eyebrow">${pz?"Pozinho · separado das finanças":"Finanças da casa"}</div><h1>${h(c.nome||DEF.nome)}</h1>
-      ${S.me?`<div class="quem">${avatar(S.me,"sm")}<span>${h(S.me.nome)}</span><span class="chip ${S.tes?"good":"warn"}">${S.tes?"tesoureiro":"à espera de aprovação"}</span><button class="linkbtn" data-act="sair">Sair</button></div>`
+      ${S.me?`<div class="quem">${avatar(S.me,"sm")}<span>${h(S.me.nome)}</span><span class="chip ${S.me.estado==="ativo"?"good":"warn"}">${S.me.estado==="ativo"?"tesoureiro · "+nomeArea(S.me.area):"à espera de aprovação · "+nomeArea(S.me.area)}</span><button class="linkbtn" data-act="sair">Sair</button></div>`
         :'<div class="quem"><button class="linkbtn" data-act="entrar">Entrar como tesoureiro</button></div>'}</div>
     ${pz?"":`<div class="monthnav">
       <button class="iconbtn" data-act="mes" data-n="-1" aria-label="Mês anterior">‹</button>
@@ -600,7 +600,9 @@ function page(){
       ${atual?"":'<button class="linkbtn" data-act="hoje">Ir para este mês</button>'}
     </div>`}</header>
   <nav class="tabs" role="tablist">${tabs.map(([k,l,c],i)=>`${!pz&&i===3?'<span class="tab-sep" aria-hidden="true"></span>':""}<button class="tab${!pz&&i>=3?" sec":""}" role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}"><span class="l-long">${l}</span><span class="l-short">${c}</span></button>`).join("")}</nav>`;
-  if(S.me&&!S.tes)out+=`<div class="banner warn">Pediste para ser tesoureiro. Quando outro tesoureiro te aprovar, ficas a poder gerir tudo. Entretanto podes ver as contas e registar compras como toda a gente.</div>`;
+  if(S.me&&S.me.estado!=="ativo")out+=`<div class="banner warn">Pediste para ser tesoureiro ${S.me.area==="pozinho"?"do pozinho":"das finanças"}. Quando ${S.me.area==="pozinho"?"um tesoureiro das finanças ou do pozinho":"outro tesoureiro das finanças"} te aprovar, ficas a poder gerir ${S.me.area==="pozinho"?"o pozinho":"as finanças"}. Entretanto podes ver tudo e registar compras como toda a gente.</div>`;
+  else if(S.me&&pz&&!S.tesPz)out+=`<div class="banner info">És tesoureiro das finanças: aqui no pozinho podes ver tudo, registar compras e aprovar tesoureiros do pozinho, mas não mexes nas contas do pozinho.</div>`;
+  else if(S.me&&!pz&&S.tesPz)out+=`<div class="banner info">És tesoureiro do pozinho: aqui nas finanças podes ver tudo e registar compras, mas não mexes nas contas das finanças.</div>`;
   if(S.tab!==inicio)out+=`<button class="linkbtn voltar" data-act="tab" data-t="${inicio}">← Voltar ao resumo</button>`;
   const fn={"pz-resumo":tPzResumo,"pz-eventos":tPzEventos,"pz-registos":tPzRegistos,resumo:tResumo,rendas:tRendas,simulacao:tSimulacao,fundo:tFundo,historico:tHistorico,definicoes:tDefinicoes}[S.tab];
   return out+`<main class="stack">${fn()}</main>`+(S.verFoto?`<div class="lightbox" data-act="foto-fechar" role="dialog" aria-label="Talão"><img src="${h(S.verFoto)}" alt="Foto do talão"><button class="btn" data-act="foto-fechar">Fechar</button></div>`:"");
@@ -884,11 +886,15 @@ function formConta(noResumo){
 
 /* ---------- tesoureiros: só eles mexem em rendas, fundo e definições; toda a gente vê e regista compras e contas ---------- */
 const gere=()=>S.canWrite&&S.tes;
-const SO_TES_FORMS=["pz-config","pz-evento-novo","conta","ajuste","renda","renda-total","previsao","fundo","config","morador","morador-edit"];
-const SO_TES_ACTS=["pz-devolver","pz-meio","pz-evento-apagar","arred-mes","ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir","morador-editar","apagar-morador","tes-aprovar","tes-recusar","tes-retirar"];
+/* tesoureiro do pozinho: gere só o pozinho */
+const gerePz=()=>S.canWrite&&!!S.tesPz;
+const nomeArea=a=>a==="pozinho"?"pozinho":"finanças";
+const SO_PZ_FORMS=["pz-config","pz-evento-novo"],SO_PZ_ACTS=["pz-devolver","pz-meio","pz-evento-apagar"];
+const SO_TES_FORMS=["conta","ajuste","renda","renda-total","previsao","fundo","config","morador","morador-edit"];
+const SO_TES_ACTS=["arred-mes","ajuste-abrir","ajuste-rm","senhorio","desp-add","desp-rm","reemb","renda-abrir","morador-editar","apagar-morador"];
 const semPermissao=()=>toast("err","Só os tesoureiros podem fazer isto.");
 const eMeu=x=>S.canWrite&&!!S.autor&&x.criadoPor===S.autor;
-const podeAnular=x=>gere()||(eMeu(x)&&(x.tipo==="compra"||x.tipo==="pz-despesa"));
+const podeAnular=x=>String(x.tipo).startsWith("pz-")?(gerePz()||(eMeu(x)&&x.tipo==="pz-despesa")):(gere()||(eMeu(x)&&x.tipo==="compra"));
 document.addEventListener("toggle",e=>{if(e.target.id==="det-prev")S.detAberto=e.target.open},true);
 
 /* calculadora da renda: previsão de cada conta + plafond, somada e dividida pelos moradores */
@@ -1142,7 +1148,7 @@ function descPz(x){
   if(x.tipo==="pz-transf")return x.descricao||(x.de==="conta"?"Levantamento da conta":"Depósito na conta");
   return x.descricao||(x.tipo==="pz-receita"?"Receita":"Despesa");
 }
-const podePzFotos=x=>x.tipo==="pz-despesa"&&(gere()||eMeu(x));
+const podePzFotos=x=>x.tipo==="pz-despesa"&&(gerePz()||eMeu(x));
 function linhaPz(x,curta){
   const ev=x.evento&&S.pzEventos.find(e=>e.id===x.evento),meta=[dataCurta(x.data)];
   if(x.tipo==="pz-despesa"){meta.push(CAT_PZ[x.categoria]||"Despesa");if(x.barris)meta.push("+"+nBarris(x.barris));if(x.pagoPor!=="bolso")meta.push(x.pagoPor==="conta"?"pago pela conta":"pago em dinheiro")}
@@ -1160,9 +1166,9 @@ function linhaPz(x,curta){
     acts=`<div class="confirm">${c.act==="anular"?"Anular este registo? Continua visível, riscado, e deixa de contar.":`Devolver ${eur(x.cent)} a ${h(x.moradorNome||"esta pessoa")} ${c.meio==="conta"?"pela conta":"em dinheiro"}?`}
       <button class="btn small ${c.act==="anular"?"danger":"primary"}" data-act="conf-sim">${c.act==="anular"?"Sim, anular":"Sim, devolver"}</button><button class="btn small" data-act="conf-nao">Cancelar</button></div>`;
   }else if(!x.anulado){
-    if(gere()&&x.tipo==="pz-despesa"&&x.pagoPor==="bolso"&&!x.reembolsado)acts+=`<button class="btn small" data-act="pz-devolver" data-id="${x.id}" data-meio="dinheiro">Devolver em dinheiro</button><button class="btn small" data-act="pz-devolver" data-id="${x.id}" data-meio="conta">Devolver pela conta</button>`;
+    if(gerePz()&&x.tipo==="pz-despesa"&&x.pagoPor==="bolso"&&!x.reembolsado)acts+=`<button class="btn small" data-act="pz-devolver" data-id="${x.id}" data-meio="dinheiro">Devolver em dinheiro</button><button class="btn small" data-act="pz-devolver" data-id="${x.id}" data-meio="conta">Devolver pela conta</button>`;
     if(!curta&&podePzFotos(x))acts+=`<button class="linkbtn" data-act="foto-camara" data-alvo="mov:${x.id}">${x.fotos&&x.fotos.length?"Outra foto do recibo":"Tirar foto do recibo"}</button><button class="linkbtn" data-act="foto-add" data-alvo="mov:${x.id}">Juntar ficheiro</button>`;
-    if(!curta&&gere()&&((x.tipo==="pz-despesa"&&x.pagoPor!=="bolso")||x.tipo==="pz-receita")){const m=x.tipo==="pz-despesa"?x.pagoPor:x.meio;acts+=`<button class="linkbtn" data-act="pz-meio" data-id="${x.id}">${m==="conta"?"Foi em dinheiro":"Foi pela conta"}</button>`}
+    if(!curta&&gerePz()&&((x.tipo==="pz-despesa"&&x.pagoPor!=="bolso")||x.tipo==="pz-receita")){const m=x.tipo==="pz-despesa"?x.pagoPor:x.meio;acts+=`<button class="linkbtn" data-act="pz-meio" data-id="${x.id}">${m==="conta"?"Foi em dinheiro":"Foi pela conta"}</button>`}
     if(podeAnular(x))acts+=`<button class="linkbtn${curta?" mini":""}" data-act="anular" data-id="${x.id}">Anular</button>`;
   }
   return `<li class="mov${x.anulado?" anulado":""}"><div><div class="mov-desc">${h(descPz(x))}</div><div class="mov-meta">${meta.map(m=>`<span>${m}</span>`).join("")}${chip}</div>${curta?"":fotosMov(x)}</div>
@@ -1181,10 +1187,10 @@ function formPz(tipo,evento){
   let campos="";
   if(tipo==="compra")campos=`<label class="fld wide"><span>O que se comprou</span><input id="f-z-desc" maxlength="120" placeholder="Ex.: tinta para a sala, frigorífico, parafusos" required></label>${valor()}${d}
       <label class="fld"><span>Para quê</span><select id="f-z-cat"><option value="casa">Casa</option><option value="obras">Obras</option><option value="eletrodomesticos">Eletrodomésticos</option><option value="outros">Outros</option></select></label>
-      <label class="fld"><span>Pago com</span><select id="f-z-pago">${optsPagoPz(gere()?"dinheiro":"bolso")}</select></label>
+      <label class="fld"><span>Pago com</span><select id="f-z-pago">${optsPagoPz(gerePz()?"dinheiro":"bolso")}</select></label>
       <label class="fld"><span>Quem comprou</span><select id="f-z-quem">${optsPessoasPz()}</select></label>${blocoFotos("p")}`;
   if(tipo==="despesa")campos=`<label class="fld wide"><span>O que se comprou ou pagou</span><input id="f-z-desc" maxlength="120" placeholder="Ex.: gelo, copos, som, DJ" required></label>${valor()}${d}
-      <label class="fld"><span>Pago com</span><select id="f-z-pago">${optsPagoPz(gere()?"dinheiro":"bolso")}</select></label>
+      <label class="fld"><span>Pago com</span><select id="f-z-pago">${optsPagoPz(gerePz()?"dinheiro":"bolso")}</select></label>
       <label class="fld"><span>Quem pagou</span><select id="f-z-quem">${optsPessoasPz()}</select></label>${blocoFotos("p")}`;
   if(tipo==="barris-comprar")campos=`<label class="fld"><span>Quantos barris</span><input id="f-z-qtd" inputmode="numeric" placeholder="Ex.: 2" required></label>${valor("Valor pago (€)")}${d}
       <label class="fld"><span>Pago com</span><select id="f-z-pago">${optsPagoPz("dinheiro")}</select></label>
@@ -1203,8 +1209,8 @@ function formPz(tipo,evento){
 }
 function botoesPz(evento){
   const b=(k,l,prim)=>`<button class="btn${prim?" primary grande":""}" data-act="pz-form" data-f="${k}" data-evento="${h(evento||"")}" aria-pressed="${S.pzForm===k}">${l}</button>`;
-  if(evento)return `<div class="hero-acoes">${b("despesa","+ Despesa",true)}${gere()?b("receita","+ Receita")+b("barris-usar","Barris usados")+b("barris-comprar","Comprar barris"):""}</div>`;
-  return `<div class="hero-acoes">${b("compra","+ Compra para a casa",true)}${gere()?b("receita","+ Receita")+b("barris-comprar","Comprar barris")+b("barris-acerto","Acertar barris")+b("transf","Depósito / levantamento"):""}</div>`;
+  if(evento)return `<div class="hero-acoes">${b("despesa","+ Despesa",true)}${gerePz()?b("receita","+ Receita")+b("barris-usar","Barris usados")+b("barris-comprar","Comprar barris"):""}</div>`;
+  return `<div class="hero-acoes">${b("compra","+ Compra para a casa",true)}${gerePz()?b("receita","+ Receita")+b("barris-comprar","Comprar barris")+b("barris-acerto","Acertar barris")+b("transf","Depósito / levantamento"):""}</div>`;
 }
 function tPzResumo(){
   const s=pzSaldo(),c=pzCfg();
@@ -1220,10 +1226,10 @@ function tPzResumo(){
   const pend=pzVivos().filter(x=>x.tipo==="pz-despesa"&&x.pagoPor==="bolso"&&!x.reembolsado).sort(ordemPz);
   const devolver=pend.length?`<div class="card"><div class="section-head"><h2>A devolver</h2><span class="muted num">${eur(s.devolver)}</span></div><div class="hint">Coisas que alguém pagou do bolso e o pozinho ainda tem de devolver.</div>${listaPz(pend,"")}</div>`:"";
   const evs=S.pzEventos.slice(0,3).map(e=>{const r=pzResultado(e.id);return `<button class="num-item" data-act="pz-evento-abrir" data-id="${h(e.id)}"><span>${dataCurta(e.data)} · ${h(e.nome)}</span><b${r.resultado<0?' style="color:var(--bad)"':""}>${r.resultado>=0?"+":"−"}${eur(Math.abs(r.resultado))}</b><small>receitas ${eur(r.receitas)} · despesas ${eur(r.despesas+r.custoCerveja)}</small></button>`}).join("");
-  const eventos=`<div class="card numeros"><div class="section-head"><div class="eyebrow">Eventos</div><button class="linkbtn" data-act="tab" data-t="pz-eventos">Ver todos</button></div>${evs?`<div class="nums">${evs}</div>`:`<div class="empty">Ainda não há eventos.${gere()?' <button class="linkbtn" data-act="tab" data-t="pz-eventos">Criar evento</button>':""}</div>`}</div>`;
+  const eventos=`<div class="card numeros"><div class="section-head"><div class="eyebrow">Eventos</div><button class="linkbtn" data-act="tab" data-t="pz-eventos">Ver todos</button></div>${evs?`<div class="nums">${evs}</div>`:`<div class="empty">Ainda não há eventos.${gerePz()?' <button class="linkbtn" data-act="tab" data-t="pz-eventos">Criar evento</button>':""}</div>`}</div>`;
   const ult=S.pz.slice().sort(ordemPz).slice(0,6);
   const registos=`<div class="card"><div class="section-head"><h2>Últimos registos</h2>${S.pz.length>6?`<button class="linkbtn" data-act="tab" data-t="pz-registos">Ver todos (${S.pz.length})</button>`:""}</div>${listaPz(ult,"Ainda não há nada registado no pozinho.",true)}</div>`;
-  const defs=gere()?`<form class="card form" data-form="pz-config" autocomplete="off"><h3>Definições do pozinho</h3>
+  const defs=gerePz()?`<form class="card form" data-form="pz-config" autocomplete="off"><h3>Definições do pozinho</h3>
     <div class="grid">
       <label class="fld"><span>Dinheiro que havia ao começar (€)</span><input id="f-zc-din" inputmode="decimal" value="${eurNum(c.inicialDinheiro)}"></label>
       <label class="fld"><span>Na conta ao começar (€)</span><input id="f-zc-conta" inputmode="decimal" value="${eurNum(c.inicialConta)}"></label>
@@ -1231,14 +1237,14 @@ function tPzResumo(){
       <label class="fld"><span>Valor de cada barril (€)</span><input id="f-zc-preco" inputmode="decimal" value="${eurNum(c.precoBarril)}"></label>
     </div>
     <div class="form-foot">${btnGuardar("Guardar")}<span class="hint">O valor de cada barril serve para contar os barris que sobram como dinheiro e para o custo da cerveja nos eventos.</span></div></form>`:"";
-  return hero+form+devolver+eventos+registos+defs;
+  return hero+form+devolver+eventos+registos+defs+tesoureirosCard();
 }
 function tPzEventos(){
   if(S.pzEvento){
     const e=S.pzEventos.find(x=>x.id===S.pzEvento);
     if(!e){S.pzEvento=null;return tPzEventos()}
     const r=pzResultado(e.id),ls=S.pz.filter(x=>x.evento===e.id).sort(ordemPz),c=S.confirm;
-    const apagar=gere()&&!pzVivos().some(x=>x.evento===e.id)?(c&&c.act==="pz-evento-apagar"&&c.id===e.id?`<span class="confirm">Apagar o evento? <button class="btn small danger" data-act="conf-sim">Apagar</button><button class="btn small" data-act="conf-nao">Cancelar</button></span>`:`<button class="linkbtn" data-act="pz-evento-apagar" data-id="${h(e.id)}" style="color:var(--bad)">Apagar evento</button>`):"";
+    const apagar=gerePz()&&!pzVivos().some(x=>x.evento===e.id)?(c&&c.act==="pz-evento-apagar"&&c.id===e.id?`<span class="confirm">Apagar o evento? <button class="btn small danger" data-act="conf-sim">Apagar</button><button class="btn small" data-act="conf-nao">Cancelar</button></span>`:`<button class="linkbtn" data-act="pz-evento-apagar" data-id="${h(e.id)}" style="color:var(--bad)">Apagar evento</button>`):"";
     return `<button class="linkbtn" data-act="pz-evento-fechar" style="justify-self:start;padding-left:0">← Todos os eventos</button>
       <div class="card hero"><div class="eyebrow">Evento · ${dataCurta(e.data)} ${e.data.slice(0,4)}</div><h2 style="font-size:24px">${h(e.nome)}</h2>${e.notas?`<div class="hint">${h(e.notas)}</div>`:""}
         <div class="sim-contas"><div><span>Receitas</span><b style="color:var(--good)">${eur(r.receitas)}</b></div><div><span>Despesas</span><b>${eur(r.despesas)}</b></div>
@@ -1248,7 +1254,7 @@ function tPzEventos(){
       ${S.pzForm&&S.pzFormEvento===e.id?formPz(S.pzForm,e.id):""}
       <div class="card"><h2 style="margin-bottom:6px">Registos do evento</h2>${listaPz(ls,"Ainda não há registos neste evento.")}</div>`;
   }
-  const novo=gere()?`<form class="card form" data-form="pz-evento-novo" autocomplete="off"><h3>Novo evento</h3><div class="grid">
+  const novo=gerePz()?`<form class="card form" data-form="pz-evento-novo" autocomplete="off"><h3>Novo evento</h3><div class="grid">
       <label class="fld"><span>Nome</span><input id="f-ze-nome" maxlength="80" placeholder="Ex.: Festa de São Martinho" required></label>
       <label class="fld"><span>Data</span><input id="f-ze-data" type="date" value="${hoje()}" required></label>
       <label class="fld wide"><span>Notas (opcional)</span><input id="f-ze-notas" maxlength="200"></label></div>
@@ -1458,26 +1464,31 @@ function pessoasCard(){
     ${todos.length?`<div class="membros">${linhas}</div>`:'<div class="empty">Ainda não há pessoas registadas.</div>'}${add}</div>`;
 }
 function tesoureirosCard(){
-  const tes=gere(),lista=S.tesoureiros.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt"));
+  const me=S.me&&S.me.estado==="ativo"?S.me:null,lista=S.tesoureiros.slice().sort((a,b)=>(a.area||"").localeCompare(b.area||"")||a.nome.localeCompare(b.nome,"pt"));
+  /* finanças aprovam todos; pozinho aprova só pozinho */
+  const podeGerir=u=>!!me&&S.canWrite&&(me.area!=="pozinho"||u.area==="pozinho");
   const pend=lista.filter(u=>u.estado==="pendente"),ativos=lista.filter(u=>u.estado==="ativo"),bloq=lista.filter(u=>u.estado==="bloqueado");
+  const ativosFin=ativos.filter(u=>u.area!=="pozinho").length;
   const linha=u=>{
     let acts="";
-    if(tes){
+    if(podeGerir(u)){
       const c=S.confirm,aConfirmar=c&&c.id===u.id&&(c.act==="tes-recusar"||c.act==="tes-retirar");
       if(aConfirmar)acts=`<span class="confirm">${c.act==="tes-recusar"?"Recusar o pedido de "+h(u.nome)+"?":"Tirar "+h(u.nome)+" de tesoureiro?"} <button class="btn small danger" data-act="conf-sim">Sim</button><button class="btn small" data-act="conf-nao">Cancelar</button></span>`;
       else if(u.estado==="pendente")acts=`<button class="btn small primary" data-act="tes-aprovar" data-id="${h(u.id)}">Aprovar</button><button class="btn small danger" data-act="tes-recusar" data-id="${h(u.id)}">Recusar</button>`;
-      else if(u.estado==="ativo"&&ativos.length>1)acts=`<button class="linkbtn" data-act="tes-retirar" data-id="${h(u.id)}" style="color:var(--bad)">${S.me&&u.id===S.me.id?"Deixar de ser tesoureiro":"Tirar de tesoureiro"}</button>`;
+      else if(u.estado==="ativo"&&!(u.area!=="pozinho"&&ativosFin<=1))acts=`<button class="linkbtn" data-act="tes-retirar" data-id="${h(u.id)}" style="color:var(--bad)">${me&&u.id===me.id?"Deixar de ser tesoureiro":"Tirar de tesoureiro"}</button>`;
       else if(u.estado==="bloqueado")acts=`<button class="linkbtn" data-act="tes-aprovar" data-id="${h(u.id)}">Voltar a aprovar</button>`;
     }
-    return `<div class="membro"><div class="membro-topo">${avatar(u)}<div class="membro-nome"><b>${h(u.nome)}${S.me&&u.id===S.me.id?' <span class="muted">(tu)</span>':""}</b>${tes&&u.email?`<span class="muted">${h(u.email)}</span>`:""}</div>${acts}</div></div>`;
+    const chip=`<span class="chip ${u.area==="pozinho"?"warn":"neutral"}">${nomeArea(u.area)}</span>`;
+    return `<div class="membro"><div class="membro-topo">${avatar(u)}<div class="membro-nome"><b>${h(u.nome)}${me&&u.id===me.id?' <span class="muted">(tu)</span>':""}</b><div class="membro-chips">${chip}${me&&u.email?`<span class="muted">${h(u.email)}</span>`:""}</div></div>${acts}</div></div>`;
   };
-  return `<div class="card"><div class="section-head"><h2>Tesoureiros</h2><span class="hint">Os tesoureiros entram com a conta Google e gerem contas, rendas, fundo e definições. Um tesoureiro novo fica à espera até outro tesoureiro o aprovar.</span></div>
-    ${tes&&pend.length?`<h3 class="sub-h">À espera de aprovação (${pend.length})</h3><div class="membros">${pend.map(linha).join("")}</div><h3 class="sub-h">Tesoureiros</h3>`:""}
-    <div class="membros">${ativos.map(linha).join("")||'<div class="empty">Ainda não há tesoureiros. Quem entrar primeiro fica logo tesoureiro.</div>'}</div>
-    ${tes&&bloq.length?`<h3 class="sub-h">Retirados (${bloq.length})</h3><div class="membros">${bloq.map(linha).join("")}</div>`:""}
+  const tesFin=gere();
+  return `<div class="card"><div class="section-head"><h2>Tesoureiros</h2><span class="hint">Entram com a conta Google. Os das <b>finanças</b> gerem rendas, contas e fundo, e aprovam tesoureiros das finanças e do pozinho. Os do <b>pozinho</b> gerem o pozinho e aprovam outros do pozinho. Ninguém mexe nas contas da outra área.</span></div>
+    ${me&&pend.length?`<h3 class="sub-h">À espera de aprovação (${pend.length})</h3><div class="membros">${pend.map(linha).join("")}</div><h3 class="sub-h">Tesoureiros</h3>`:""}
+    <div class="membros">${ativos.map(linha).join("")||'<div class="empty">Ainda não há tesoureiros. Quem entrar primeiro fica logo tesoureiro das finanças.</div>'}</div>
+    ${me&&bloq.length?`<h3 class="sub-h">Retirados (${bloq.length})</h3><div class="membros">${bloq.map(linha).join("")}</div>`:""}
     ${!S.me?'<div class="form-foot"><button class="btn" data-act="entrar">Entrar como tesoureiro</button></div>':""}
-    ${tes?'<div class="form-foot"><a class="btn small" href="/api/copia-seguranca">Descarregar cópia de segurança</a><span class="hint">Tem todos os registos; as fotos dos talões estão na pasta <code>dados/fotos</code> do servidor.</span></div>':""}
-    ${tes&&!S.moradores.length&&!allMovs().length?'<div class="form-foot"><button class="btn small" data-act="importar">Importar dados (.json)</button><span class="hint">Para trazer os dados de outra Caixa da Casa (por exemplo, da versão que estava no Claude). Só funciona com a app ainda vazia.</span></div>':""}</div>`;
+    ${tesFin&&S.area!=="pozinho"?'<div class="form-foot"><a class="btn small" href="/api/copia-seguranca">Descarregar cópia de segurança</a><span class="hint">Tem todos os registos (finanças e pozinho); as fotos estão na pasta <code>dados/fotos</code> do servidor.</span></div>':""}
+    ${tesFin&&S.area!=="pozinho"&&!S.moradores.length&&!allMovs().length?'<div class="form-foot"><button class="btn small" data-act="importar">Importar dados (.json)</button><span class="hint">Para trazer os dados de outra Caixa da Casa (por exemplo, da versão que estava no Claude). Só funciona com a app ainda vazia.</span></div>':""}</div>`;
 }
 
 function pedirNomes(){}
@@ -1604,7 +1615,7 @@ const handlers={
     const el=document.getElementById("sim-novo-nome");if(el){el.value="";document.getElementById("sim-novo-valor").value=""}
   },
   async dev(){
-    try{await api("POST","/api/entrar/dev",{email:val("d-email"),nome:val("d-nome")});location.reload()}
+    try{await api("POST","/api/entrar/dev",{email:val("d-email"),nome:val("d-nome"),area:S.areaPedido||"financas"});location.reload()}
     catch(e){toast("err",e.message||"Não deu para entrar")}
   },
   async morador(){
@@ -1641,7 +1652,7 @@ const handlers={
     if(ok){S.editMorador=null;toast("ok",mudou?"Guardado. Conta a partir de "+nomeMes(S.mes).toLowerCase():"Guardado")}
   }
 };
-document.addEventListener("submit",e=>{const f=e.target.closest("form[data-form]");if(!f)return;e.preventDefault();if(SO_TES_FORMS.includes(f.dataset.form)&&!gere())return semPermissao();const fn=handlers[f.dataset.form];if(fn)fn(f)});
+document.addEventListener("submit",e=>{const f=e.target.closest("form[data-form]");if(!f)return;e.preventDefault();if(SO_TES_FORMS.includes(f.dataset.form)&&!gere())return semPermissao();if(SO_PZ_FORMS.includes(f.dataset.form)&&!gerePz())return toast("err","Só os tesoureiros do pozinho podem fazer isto.");const fn=handlers[f.dataset.form];if(fn)fn(f)});
 
 async function addDespesa(){
   const nome=val("f-d-nome").trim().replace(/\s+/g," ");if(!nome)return toast("err","Escreve o nome da despesa");
@@ -1658,12 +1669,14 @@ document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;
   const a=b.dataset.act,id=b.dataset.id;
   if(SO_TES_ACTS.includes(a)&&!gere())return semPermissao();
+  if(SO_PZ_ACTS.includes(a)&&!gerePz())return toast("err","Só os tesoureiros do pozinho podem fazer isto.");
   if(a==="tab")return ir(b.dataset.t);
   if(a==="filtro"){S.filtro=b.dataset.f;S.verTodos=true;render();const el=document.getElementById("registos");if(el&&b.closest(".numeros"))el.scrollIntoView({behavior:"smooth"});return}
   if(a==="ver-todos"){S.verTodos=true;S.filtro="tudo";return render()}
   if(a==="ver-menos"){S.verTodos=false;S.filtro="tudo";return render()}
   if(a==="sair"){await fetch("/api/sair",{method:"POST",credentials:"same-origin"}).catch(()=>{});location.reload();return}
-  if(a==="entrar"){S.vista="entrar";S.fresh=true;render();window.scrollTo({top:0});return}
+  if(a==="area-pedido"){S.areaPedido=b.dataset.a;const el=document.getElementById("g-botao");const keep=el&&el.dataset.pronto;render();return}
+  if(a==="entrar"){S.areaPedido=S.area==="pozinho"?"pozinho":"financas";S.vista="entrar";S.fresh=true;render();window.scrollTo({top:0});return}
   if(a==="entrar-voltar"){S.vista=null;S.fresh=true;return render()}
   if(a==="eu-mudar")return escolherEu(null);
   if(a==="area"){S.area=b.dataset.a==="pozinho"?"pozinho":"financas";try{localStorage.setItem("caixa-area",S.area)}catch(e){}S.pzForm=null;S.pzEvento=null;return ir(S.area==="pozinho"?"pz-resumo":"resumo")}
@@ -1787,7 +1800,7 @@ async function exportar(q){
 function mostrar(html){app.innerHTML=`<div class="entrada">${html}</div>`}
 async function carregar(){
   const r=await api("GET","/api/estado");
-  S.me=r.eu;S.autor=r.autor;S.tes=!!(S.me&&S.me.estado==="ativo");
+  S.me=r.eu;S.autor=r.autor;S.tes=!!(S.me&&S.me.estado==="ativo"&&S.me.area!=="pozinho");S.tesPz=!!(S.me&&S.me.estado==="ativo"&&S.me.area==="pozinho");
   S.moradores=r.pessoas||[];
   S.tesoureiros=r.tesoureiros||[];
   S.names={};S.tesoureiros.forEach(u=>{S.names[u.id]=u.nome});
@@ -1811,7 +1824,10 @@ function vistaEntrar(){
   const p=S.pub||{},haTes=S.tesoureiros.some(u=>u.estado==="ativo");
   return `<div class="entrada"><div class="card entrada-card"><div class="eyebrow">${h(S.config.nome||p.nomeCasa||DEF.nome)}</div><h1>Entrar como tesoureiro</h1>
     <p>Para ver as contas e registar compras não precisas de conta. Só os tesoureiros entram, para gerir rendas, contas, fundo de maneio e definições.</p>
-    <p>${haTes?"Depois de entrares, outro tesoureiro tem de te aprovar.":"Ainda não há nenhum tesoureiro: quem entrar primeiro fica logo tesoureiro."}</p>
+    <p>${haTes?"Escolhe de que área queres ser tesoureiro. Depois de entrares, alguém tem de te aprovar.":"Ainda não há nenhum tesoureiro: quem entrar primeiro fica logo tesoureiro das finanças."}</p>
+    ${haTes?`<div class="areas" role="radiogroup" aria-label="Área">
+      <button type="button" class="area${S.areaPedido!=="pozinho"?" on":""}" role="radio" aria-checked="${S.areaPedido!=="pozinho"}" data-act="area-pedido" data-a="financas"><b>Finanças</b><span>rendas, contas e comida</span></button>
+      <button type="button" class="area pz-area${S.areaPedido==="pozinho"?" on":""}" role="radio" aria-checked="${S.areaPedido==="pozinho"}" data-act="area-pedido" data-a="pozinho"><b>Pozinho</b><span>atividades, eventos e casa</span></button></div>`:""}
     <div id="g-botao" class="g-botao">${p.googleClientId?'<span class="muted">A carregar o botão do Google…</span>':'<span class="muted">O servidor ainda não tem o login do Google configurado (falta GOOGLE_CLIENT_ID).</span>'}</div>
     ${p.devLogin?`<form data-form="dev" class="grid dev" autocomplete="off"><div class="hint" style="grid-column:1/-1">Login de teste (só neste computador)</div>
       <label class="fld"><span>Email</span><input id="d-email" type="email" required></label>
@@ -1827,7 +1843,7 @@ async function montarGoogle(){
   if(!(window.google&&google.accounts&&google.accounts.id)){el.innerHTML='<span class="muted">Não foi possível carregar o login do Google. Verifica a ligação e recarrega a página.</span>';return}
   if(!gisIniciado){
     google.accounts.id.initialize({client_id:p.googleClientId,callback:async r=>{
-      try{await api("POST","/api/entrar/google",{credential:r.credential});location.reload()}
+      try{await api("POST","/api/entrar/google",{credential:r.credential,area:S.areaPedido||"financas"});location.reload()}
       catch(err){toast("err",err.message||"Não foi possível entrar")}
     }});
     gisIniciado=true;

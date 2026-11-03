@@ -91,6 +91,8 @@ db.exec(`
   const cols = db.prepare("PRAGMA table_info(utilizadores)").all().map(c => c.name);
   if (!cols.includes("estado")) db.exec("ALTER TABLE utilizadores ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendente'");
   if (!cols.includes("aprovado_por")) db.exec("ALTER TABLE utilizadores ADD COLUMN aprovado_por TEXT");
+  // área de cada tesoureiro: "financas" (rendas, contas, comida) ou "pozinho" (atividades, eventos, casa)
+  if (!cols.includes("area")) db.exec("ALTER TABLE utilizadores ADD COLUMN area TEXT NOT NULL DEFAULT 'financas'");
   if (cols.includes("tipo")) {
     db.exec(`
       INSERT OR IGNORE INTO pessoas (id, nome, tipo, valor_fixo, entrada, saida, criado_em)
@@ -124,10 +126,14 @@ class ErroHttp extends Error {
 const falha = (status, msg) => { throw new ErroHttp(status, msg); };
 
 const eTes = u => !!u && u.estado === "ativo";
+const areaDe = u => (u && u.area === "pozinho" ? "pozinho" : "financas");
 const nAtivos = () => db.prepare("SELECT COUNT(*) AS n FROM utilizadores WHERE estado = 'ativo'").get().n;
+const nAtivosFin = () => db.prepare("SELECT COUNT(*) AS n FROM utilizadores WHERE estado = 'ativo' AND area <> 'pozinho'").get().n;
+/* quem pode aprovar/retirar este tesoureiro: os das finanças aprovam todos; os do pozinho só os do pozinho */
+const podeGerirTes = (req, u) => req.tesFin || (req.tesPz && areaDe(u) === "pozinho");
 
 function tesPublico(u, completo) {
-  const p = { id: u.id, nome: u.nome, foto: u.foto || null, estado: u.estado };
+  const p = { id: u.id, nome: u.nome, foto: u.foto || null, estado: u.estado, area: areaDe(u) };
   if (completo) { p.email = u.email; p.criadoEm = u.criado_em; }
   return p;
 }
@@ -176,6 +182,8 @@ function identificar(req, res, next) {
     if (u && u.estado !== "bloqueado") req.user = u;
   }
   req.tes = eTes(req.user);
+  req.tesFin = req.tes && areaDe(req.user) === "financas";
+  req.tesPz = req.tes && areaDe(req.user) === "pozinho";
   req.autor = req.user ? req.user.id : req.disp;
   next();
 }
@@ -184,21 +192,37 @@ const soTesoureiro = (req, res, next) => {
   if (!req.tes) return res.status(403).json({ erro: "Só os tesoureiros aprovados podem fazer isto." });
   next();
 };
+const soFinancas = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ erro: "Entra como tesoureiro." });
+  if (!req.tesFin) return res.status(403).json({ erro: "Só os tesoureiros das finanças podem fazer isto." });
+  next();
+};
+const soPozinho = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ erro: "Entra como tesoureiro." });
+  if (!req.tesPz) return res.status(403).json({ erro: "Só os tesoureiros do pozinho podem fazer isto." });
+  next();
+};
 
 /* entra (ou regista) um tesoureiro que o Google confirmou */
-function entrarUtilizador({ sub, email, nome, foto }) {
+function entrarUtilizador({ sub, email, nome, foto, area }) {
+  area = area === "pozinho" ? "pozinho" : "financas";
   email = email.toLowerCase();
   let u = (sub && db.prepare("SELECT * FROM utilizadores WHERE google_sub = ?").get(sub))
        || db.prepare("SELECT * FROM utilizadores WHERE email = ?").get(email);
   const automatico = TESOUREIROS_EMAILS.includes(email) || nAtivos() === 0;
   if (!u) {
     const id = novoId();
-    db.prepare(`INSERT INTO utilizadores (id, google_sub, email, nome, foto, estado, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, sub || null, email, txt(nome, 80) || email, foto || null, automatico ? "ativo" : "pendente", agora());
+    if (TESOUREIROS_EMAILS.includes(email) || nAtivos() === 0) area = "financas"; // o primeiro (e os do .env) são das finanças
+    db.prepare(`INSERT INTO utilizadores (id, google_sub, email, nome, foto, estado, area, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, sub || null, email, txt(nome, 80) || email, foto || null, automatico ? "ativo" : "pendente", area, agora());
     u = utilPorId(id);
     avisar(); // os outros tesoureiros veem logo o pedido
   } else {
     db.prepare("UPDATE utilizadores SET google_sub = COALESCE(google_sub, ?), foto = COALESCE(?, foto) WHERE id = ?").run(sub || null, foto || null, u.id);
+    if (u.estado === "pendente" && !automatico && areaDe(u) !== area) {
+      db.prepare("UPDATE utilizadores SET area = ? WHERE id = ?").run(area, u.id); // mudou de ideias antes de ser aprovado
+      avisar();
+    }
     if (u.estado === "pendente" && automatico) {
       db.prepare("UPDATE utilizadores SET estado = 'ativo' WHERE id = ?").run(u.id);
       avisar();
@@ -240,8 +264,8 @@ function fotosValidas(lista) {
    pz-despesa: compra/despesa (qualquer pessoa com o link); pz-receita, pz-barris, pz-transf: tesoureiros. */
 const eventoPorId = id => (typeof id === "string" && id ? db.prepare("SELECT * FROM pz_eventos WHERE id = ?").get(id) : undefined);
 function movimentoPozinho(b, req) {
-  const tes = req.tes, tipo = b.tipo;
-  if (!tes && tipo !== "pz-despesa") falha(403, "Só os tesoureiros podem registar isto.");
+  const tes = req.tesPz, tipo = b.tipo;
+  if (!tes && tipo !== "pz-despesa") falha(403, "Só os tesoureiros do pozinho podem registar isto.");
   if (!reMes.test(b.mes || "") || !reData.test(b.data || "")) falha(400, "Data inválida.");
   const m = { tipo, area: "pozinho", mes: b.mes, data: b.data, descricao: txt(b.descricao, 200) };
   const ev = eventoPorId(b.evento);
@@ -274,11 +298,11 @@ function movimentoPozinho(b, req) {
   return m;
 }
 function novoMovimento(b, req) {
-  const tes = req.tes;
+  const tes = req.tesFin;
   const tipo = b.tipo;
   if (["pz-despesa", "pz-receita", "pz-barris", "pz-transf"].includes(tipo)) return movimentoPozinho(b, req);
   if (!["compra", "conta", "renda", "fundo"].includes(tipo)) falha(400, "Tipo de registo inválido.");
-  if (!tes && tipo !== "compra") falha(403, "Só os tesoureiros podem registar isto.");
+  if (!tes && tipo !== "compra") falha(403, "Só os tesoureiros das finanças podem registar isto.");
   if (!Number.isInteger(b.cent) || b.cent <= 0 || b.cent > 1e9) falha(400, "Valor inválido.");
   if (!reMes.test(b.mes || "") || !reData.test(b.data || "")) falha(400, "Data inválida.");
   const m = { tipo, mes: b.mes, data: b.data, cent: b.cent, descricao: txt(b.descricao, 200) };
@@ -402,7 +426,7 @@ app.post("/api/entrar/google", limitar("entrar", 30, 36e5), async (req, res) => 
     return res.status(401).json({ erro: "Não foi possível confirmar a conta Google. Tenta outra vez." });
   }
   if (!p || !p.email || !p.email_verified) return res.status(403).json({ erro: "A conta Google não tem um email confirmado." });
-  const u = entrarUtilizador({ sub: p.sub, email: p.email, nome: p.name, foto: p.picture });
+  const u = entrarUtilizador({ sub: p.sub, email: p.email, nome: p.name, foto: p.picture, area: req.body.area });
   if (u.estado === "bloqueado") return res.status(403).json({ erro: "Esta conta não pode ser tesoureira. Fala com outro tesoureiro." });
   criarSessao(res, u.id);
   res.json({ eu: tesPublico(u, true) });
@@ -413,7 +437,7 @@ app.post("/api/entrar/dev", (req, res) => {
   if (!DEV_LOGIN || !loopback(req)) return res.status(404).json({ erro: "Não existe." });
   const email = txt(req.body && req.body.email, 120).toLowerCase();
   if (!/^[^@\s]+@[^@\s]+$/.test(email)) return res.status(400).json({ erro: "Email inválido." });
-  const u = entrarUtilizador({ sub: null, email, nome: txt(req.body.nome, 80) || email.split("@")[0], foto: null });
+  const u = entrarUtilizador({ sub: null, email, nome: txt(req.body.nome, 80) || email.split("@")[0], foto: null, area: req.body.area });
   if (u.estado === "bloqueado") return res.status(403).json({ erro: "Esta conta não pode ser tesoureira." });
   criarSessao(res, u.id);
   res.json({ eu: tesPublico(u, true) });
@@ -468,7 +492,8 @@ app.patch("/api/movimentos/:id", limitar("registar", 120, 36e5), (req, res) => {
   const row = db.prepare("SELECT dados FROM movimentos WHERE id = ?").get(req.params.id);
   if (!row) falha(404, "Registo não encontrado.");
   const m = JSON.parse(row.dados), b = req.body || {};
-  const tes = req.tes, minhaCompra = m.criadoPor === req.autor && (m.tipo === "compra" || m.tipo === "pz-despesa");
+  const tes = String(m.tipo).startsWith("pz-") ? req.tesPz : req.tesFin;
+  const minhaCompra = m.criadoPor === req.autor && (m.tipo === "compra" || m.tipo === "pz-despesa");
   if (b.anulado === true) {
     if (!tes && !minhaCompra) falha(403, "Só podes anular as compras que registaste neste aparelho.");
     if (!m.anulado) Object.assign(m, { anulado: true, anuladoPor: req.autor, anuladoEm: agora() });
@@ -502,6 +527,9 @@ app.patch("/api/movimentos/:id", limitar("registar", 120, 36e5), (req, res) => {
 });
 
 app.put("/api/config", soTesoureiro, (req, res) => {
+  const ks = Object.keys(req.body || {});
+  if (ks.includes("pozinho") && !req.tesPz) falha(403, "Só os tesoureiros do pozinho mexem nas definições do pozinho.");
+  if (ks.some(k => k !== "pozinho") && !req.tesFin) falha(403, "Só os tesoureiros das finanças podem fazer isto.");
   const c = Object.assign(lerConfig() || {}, mudancasConfig(req.body));
   if (JSON.stringify(c).length > 1_000_000) falha(413, "As definições ficaram grandes demais.");
   gravarConfig(c);
@@ -510,14 +538,14 @@ app.put("/api/config", soTesoureiro, (req, res) => {
 });
 
 /* pessoas da casa (moradores, comensais, meios comensais): só os tesoureiros mexem */
-app.post("/api/pessoas", soTesoureiro, (req, res) => {
+app.post("/api/pessoas", soFinancas, (req, res) => {
   const d = dadosPessoa(req.body || {}, false), id = novoId();
   db.prepare("INSERT INTO pessoas (id, nome, tipo, valor_fixo, entrada, saida, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .run(id, d.nome, d.tipo, d.valor_fixo, d.entrada, d.saida, agora());
   avisar();
   res.status(201).json(pessoaPublica(pessoaPorId(id)));
 });
-app.patch("/api/pessoas/:id", soTesoureiro, (req, res) => {
+app.patch("/api/pessoas/:id", soFinancas, (req, res) => {
   const p = pessoaPorId(req.params.id);
   if (!p) falha(404, "Pessoa não encontrada.");
   const d = dadosPessoa(req.body || {}, true), cols = Object.keys(d);
@@ -527,7 +555,7 @@ app.patch("/api/pessoas/:id", soTesoureiro, (req, res) => {
   }
   res.json(pessoaPublica(pessoaPorId(p.id)));
 });
-app.delete("/api/pessoas/:id", soTesoureiro, (req, res) => {
+app.delete("/api/pessoas/:id", soFinancas, (req, res) => {
   const p = pessoaPorId(req.params.id);
   if (!p) falha(404, "Pessoa não encontrada.");
   const usada = db.prepare("SELECT 1 FROM movimentos WHERE json_extract(dados, '$.morador') = ? LIMIT 1").get(p.id);
@@ -544,20 +572,20 @@ function dadosEvento(b) {
   if (!reData.test((b && b.data) || "")) falha(400, "Escolhe a data do evento.");
   return { nome, data: b.data, notas: txt(b.notas, 400) };
 }
-app.post("/api/pz-eventos", soTesoureiro, (req, res) => {
+app.post("/api/pz-eventos", soPozinho, (req, res) => {
   const d = dadosEvento(req.body), id = novoId();
   db.prepare("INSERT INTO pz_eventos (id, nome, data, notas, criado_em) VALUES (?, ?, ?, ?, ?)").run(id, d.nome, d.data, d.notas, agora());
   avisar();
   res.status(201).json(Object.assign({ id }, d));
 });
-app.patch("/api/pz-eventos/:id", soTesoureiro, (req, res) => {
+app.patch("/api/pz-eventos/:id", soPozinho, (req, res) => {
   if (!eventoPorId(req.params.id)) falha(404, "Evento não encontrado.");
   const d = dadosEvento(req.body);
   db.prepare("UPDATE pz_eventos SET nome = ?, data = ?, notas = ? WHERE id = ?").run(d.nome, d.data, d.notas, req.params.id);
   avisar();
   res.json(Object.assign({ id: req.params.id }, d));
 });
-app.delete("/api/pz-eventos/:id", soTesoureiro, (req, res) => {
+app.delete("/api/pz-eventos/:id", soPozinho, (req, res) => {
   if (!eventoPorId(req.params.id)) falha(404, "Evento não encontrado.");
   const usado = db.prepare("SELECT 1 FROM movimentos WHERE json_extract(dados, '$.evento') = ? AND json_extract(dados, '$.anulado') = 0 LIMIT 1").get(req.params.id);
   if (usado) falha(400, "Este evento tem registos. Anula-os primeiro, ou deixa o evento ficar.");
@@ -572,7 +600,8 @@ app.patch("/api/tesoureiros/:id", soTesoureiro, (req, res) => {
   if (!u) falha(404, "Tesoureiro não encontrado.");
   const estado = req.body && req.body.estado;
   if (!["ativo", "bloqueado"].includes(estado)) falha(400, "Estado inválido.");
-  if (estado === "bloqueado" && u.estado === "ativo" && nAtivos() <= 1) falha(400, "Tem de ficar pelo menos um tesoureiro.");
+  if (!podeGerirTes(req, u)) falha(403, "Os tesoureiros do pozinho só aprovam ou retiram tesoureiros do pozinho.");
+  if (estado === "bloqueado" && u.estado === "ativo" && areaDe(u) === "financas" && nAtivosFin() <= 1) falha(400, "Tem de ficar pelo menos um tesoureiro das finanças.");
   db.prepare("UPDATE utilizadores SET estado = ?, aprovado_por = CASE WHEN ? = 'ativo' THEN ? ELSE aprovado_por END WHERE id = ?")
     .run(estado, estado, req.user.id, u.id);
   if (estado === "bloqueado") db.prepare("DELETE FROM sessoes WHERE utilizador_id = ?").run(u.id);
@@ -583,6 +612,7 @@ app.delete("/api/tesoureiros/:id", soTesoureiro, (req, res) => {
   const u = utilPorId(req.params.id);
   if (!u) falha(404, "Tesoureiro não encontrado.");
   if (u.estado !== "pendente") falha(400, "Só se podem recusar pedidos pendentes.");
+  if (!podeGerirTes(req, u)) falha(403, "Os tesoureiros do pozinho só recusam pedidos do pozinho.");
   db.prepare("DELETE FROM utilizadores WHERE id = ?").run(u.id);
   avisar();
   res.json({ ok: true });
@@ -609,7 +639,7 @@ app.get("/api/fotos/:id", (req, res) => {
 
 // Importar dados de outra Caixa da Casa (ou da versão antiga no Claude): só numa app ainda vazia.
 const reId = /^[A-Za-z0-9_-]{1,64}$/;
-app.post("/api/importar", soTesoureiro, express.json({ limit: "80mb" }), (req, res) => {
+app.post("/api/importar", soFinancas, express.json({ limit: "80mb" }), (req, res) => {
   const b = req.body || {};
   if (b.formato !== "caixa-da-casa") falha(400, "Este ficheiro não é uma exportação da Caixa da Casa.");
   const ja = db.prepare("SELECT (SELECT COUNT(*) FROM pessoas) + (SELECT COUNT(*) FROM movimentos) AS n").get().n;
@@ -676,7 +706,7 @@ app.post("/api/importar", soTesoureiro, express.json({ limit: "80mb" }), (req, r
 });
 
 // Cópia de segurança da base de dados (não inclui as fotos; essas estão em DATA_DIR/fotos).
-app.get("/api/copia-seguranca", soTesoureiro, (_req, res) => {
+app.get("/api/copia-seguranca", soFinancas, (_req, res) => {
   const tmp = path.join(DATA_DIR, `copia-${Date.now()}.db`);
   db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
   res.download(tmp, `caixa-da-casa-${agora().slice(0, 10)}.db`, () => fs.rm(tmp, { force: true }, () => {}));
