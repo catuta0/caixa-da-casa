@@ -352,7 +352,9 @@ const DEF={nome:"Casa comunitária",plafond:40000,plafondMes:{},rendaMes:{},prev
 const DESPESAS_DEF=[{id:"renda",nome:"Renda ao senhorio",cat:"Renda da casa"},{id:"agua",nome:"Água"},{id:"luz",nome:"Luz"},{id:"gas",nome:"Gás"},{id:"internet",nome:"Internet"},{id:"condominio",nome:"Condomínio"},{id:"seguro",nome:"Seguro"},{id:"outra",nome:"Outras contas",cat:"Outra"},{id:"reserva",nome:"Reserva para o fundo de maneio",semConta:true}];
 const despesas=()=>S.config.despesas||DESPESAS_DEF;
 const catDe=d=>d.cat||d.nome;
-function tiposConta(){const t=despesas().filter(d=>!d.removida&&!d.semConta).map(catDe);if(!t.includes("Outra"))t.push("Outra");return t}
+function tiposConta(){const t=despesas().filter(d=>!d.removida&&!d.semConta).map(catDe);if(!t.includes("Sociais"))t.push("Sociais");if(!t.includes("Outra"))t.push("Outra");return t}
+/* sociais do mês: o que entrou no plafond e o que já foi pago (conta "Sociais") */
+function sociaisMes(m){const vis=vivos(),tot=sum(vis.filter(x=>x.tipo==="compra"&&x.mes===m&&x.pagoPor==="sociais")),pago=sum(vis.filter(x=>x.tipo==="conta"&&x.mes===m&&x.categoria==="Sociais"));return {tot,pago,falta:Math.max(0,tot-pago)}}
 function nomeLinha(k){if(k==="plafond")return "comida";const d=despesas().find(x=>x.id===k);return d?d.nome.toLowerCase():k}
 const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 const TABS=[["resumo","Resumo","Resumo"],["rendas","Rendas","Rendas"],["simulacao","Simulação","Simular"],["fundo","Fundo de maneio","Fundo"],["historico","Histórico","Histórico"],["definicoes","Definições","Definições"]];
@@ -700,7 +702,7 @@ function tResumo(){
     <div class="eyebrow">Plafond de compras · ${nomeMes(m)}</div>
     ${st.plafond?`<div class="big${resta<0?" over":""}">${eur(Math.abs(resta))}<small>${resta>=0?"ainda por gastar":"acima do plafond"}</small></div>
     <div class="bar" role="img" aria-label="Gasto ${Math.round(pct*100)}% do plafond"><div class="fill ${cls}" style="width:${Math.min(100,pct*100).toFixed(1)}%"></div>${atual?`<div class="pace" style="left:calc(${(pace*100).toFixed(1)}% - 1px)" title="A linha fina marca onde devíamos ir hoje"></div>`:""}</div>
-    <div class="bar-legend"><span>Gasto <b>${eur(st.compras)}</b> de ${eur(st.plafond)}${(()=>{const so=sum(vis.filter(x=>x.tipo==="compra"&&x.mes===m&&x.pagoPor==="sociais"));return so?` · inclui ${eur(so)} de sociais`:""})()}</span>${ritmo?`<span>${ritmo}</span>`:""}</div>`
+    <div class="bar-legend"><span>Gasto <b>${eur(st.compras)}</b> de ${eur(st.plafond)}${(()=>{const so=sociaisMes(m);if(!so.tot)return "";return ` · inclui ${eur(so.tot)} de sociais`+(so.falta?` (<b>${eur(so.falta)}</b> por pagar${gere()&&S.canWrite?` <button class="linkbtn" data-act="resumo-form" data-f="conta" data-preset="sociais">Pagar sociais</button>`:""})`:" (pagos)")})()}</span>${ritmo?`<span>${ritmo}</span>`:""}</div>`
     :`<div class="big">${eur(st.compras)}<small>gastos em compras</small></div><div class="hint">Ainda não há plafond definido.${gere()?' <button class="linkbtn" data-act="tab" data-t="definicoes">Definir plafond</button>':""}</div>`}
     ${botoes}</div>`;
   const formAberto=rf==="compra"?formCompra(true):rf==="conta"?formConta(true):"";
@@ -1715,7 +1717,8 @@ document.addEventListener("click",async e=>{
   if(a==="foto-tirar"){const l=S.fotos[b.dataset.alvo],i=+b.dataset.i;if(l&&l[i]){try{URL.revokeObjectURL(l[i].url)}catch(e){}l.splice(i,1)}return render()}
   if(a==="foto-ver"){S.verFoto=b.dataset.src;return render()}
   if(a==="foto-fechar"){S.verFoto=null;return render()}
-  if(a==="resumo-form"){const f=b.dataset.f,pre=b.dataset.preset||null;if(f==="conta"&&!gere())return semPermissao();S.resumoForm=S.resumoForm===f&&S.preset===pre?null:f;S.preset=S.resumoForm?pre:null;S.reset=f==="compra"?"f-c-":"f-k-";render();if(S.preset==="sociais"){const pg=document.getElementById("f-c-pago"),ds=document.getElementById("f-c-desc");if(pg)pg.value="sociais";if(ds&&!ds.value)ds.value="Sociais da semana"}const el=document.getElementById(f==="compra"?(S.preset==="sociais"?"f-c-valor":"f-c-desc"):"f-k-valor");if(el&&S.resumoForm)el.focus();return}
+  if(a==="resumo-form"){const f=b.dataset.f,pre=b.dataset.preset||null;if(f==="conta"&&!gere())return semPermissao();S.resumoForm=S.resumoForm===f&&S.preset===pre?null:f;S.preset=S.resumoForm?pre:null;S.reset=f==="compra"?"f-c-":"f-k-";render();if(S.preset==="sociais"&&f==="conta"){const tp=document.getElementById("f-k-tipo"),vl=document.getElementById("f-k-valor"),ms=document.getElementById("f-k-mes"),ds=document.getElementById("f-k-desc");if(tp)tp.value="Sociais";if(ms)ms.value=S.mes;if(vl&&!vl.value)vl.value=eurNum(sociaisMes(S.mes).falta);if(ds&&!ds.value)ds.value="Sociais de "+nomeMes(S.mes).toLowerCase()}
+  else if(S.preset==="sociais"){const pg=document.getElementById("f-c-pago"),ds=document.getElementById("f-c-desc");if(pg)pg.value="sociais";if(ds&&!ds.value)ds.value="Sociais da semana"}const el=document.getElementById(f==="compra"?(S.preset==="sociais"?"f-c-valor":"f-c-desc"):"f-k-valor");if(el&&S.resumoForm)el.focus();return}
   if(a==="resumo-fechar"){S.resumoForm=null;S.preset=null;return render()}
   if(a==="anular"||a==="reemb"||a==="desp-rm"){S.confirm={act:a,id};return render()}
   if(a==="conf-nao"){S.confirm=null;return render()}
