@@ -352,8 +352,8 @@ const DEF={nome:"Casa comunitária",plafond:40000,plafondMes:{},rendaMes:{},prev
 const DESPESAS_DEF=[{id:"renda",nome:"Renda ao senhorio",cat:"Renda da casa"},{id:"agua",nome:"Água"},{id:"luz",nome:"Luz"},{id:"gas",nome:"Gás"},{id:"internet",nome:"Internet"},{id:"condominio",nome:"Condomínio"},{id:"seguro",nome:"Seguro"},{id:"outra",nome:"Outras contas",cat:"Outra"},{id:"reserva",nome:"Reserva para o fundo de maneio",semConta:true}];
 const despesas=()=>S.config.despesas||DESPESAS_DEF;
 const catDe=d=>d.cat||d.nome;
-function tiposConta(){const t=despesas().filter(d=>!d.removida&&!d.semConta).map(catDe);if(!t.includes("Outra"))t.push("Outra");if(!t.includes("Sociais"))t.splice(t.indexOf("Outra"),0,"Sociais");return t}
-/* uma conta "Sociais" é o pagamento no fim do mês: só sai do fundo; o plafond já tem os sociais da semana */
+function tiposConta(){const t=despesas().filter(d=>!d.removida&&!d.semConta).map(catDe);if(!t.includes("Outra"))t.push("Outra");if(!t.includes("Compras (sociais)"))t.splice(t.indexOf("Outra"),0,"Compras (sociais)");return t}
+/* uma conta "Compras (sociais)" é o pagamento no fim do mês: só sai do fundo; o plafond já tem os sociais da semana */
 function nomeLinha(k){if(k==="plafond")return "comida";const d=despesas().find(x=>x.id===k);return d?d.nome.toLowerCase():k}
 const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 const TABS=[["resumo","Resumo","Resumo"],["rendas","Rendas","Rendas"],["simulacao","Simulação","Simular"],["fundo","Fundo de maneio","Fundo"],["historico","Histórico","Histórico"],["definicoes","Definições","Definições"]];
@@ -902,7 +902,7 @@ document.addEventListener("toggle",e=>{if(e.target.id==="det-prev")S.detAberto=e
 /* linhas da calculadora: [id, nome, categoria de conta ou null, removida] — a comida (plafond) está sempre lá */
 function linhasPrev(m){
   const pv=(S.config.previsaoMes||{})[m]||{};
-  return [["plafond","Comida (plafond de compras)",null,false]].concat(despesas().filter(d=>!d.removida||pv[d.id]).map(d=>[d.id,d.nome,d.semConta?null:catDe(d),!!d.removida]));
+  return [["plafond","Comida (plafond de compras e sociais)",null,false]].concat(despesas().filter(d=>!d.removida||pv[d.id]).map(d=>[d.id,d.nome,d.semConta?null:catDe(d),!!d.removida]));
 }
 function realPrev(k,m,vis){
   if(k==="plafond")return sum(vis.filter(x=>x.tipo==="compra"&&x.mes===m));
